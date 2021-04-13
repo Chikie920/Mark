@@ -414,11 +414,11 @@ SOCKET WSAAPI accept(
 
 **函数参数**
 
-参数一为服务端socket即server_socket
+**参数一**为服务端socket即server_socket
 
-参数二为sockaddr类型的结构体指针，用于储存一个客户端信息，我们还是使用sockaddr_in类型更便捷
+**参数二**为sockaddr类型的结构体指针，用于储存一个客户端信息，我们还是使用sockaddr_in类型更便捷
 
-参数三为结构体大小的整型指针
+**参数三**为结构体大小的整型指针
 
 该函数是通过从服务端socket获取客户端信息进行储存，储存到我们所填的参数二与三的变量中。
 
@@ -701,6 +701,8 @@ int main(void)
 
 如果你试着写出了C/S模型，你会发现我们上面所写的模型server端不能与多个client端通信，并且当与一个client端通信时只能以一种“回合制”模式进行。因为listen()与accept()函数只接收了一个client_socket，只能与一个client通信，而我们的recv()函数是阻塞的，当没有另一端的信息时会一直等待，无法执行后续的代码(accept函数也是如此)。这样的通讯无疑是没有实际用处的。
 
+
+
 # C/S模型优化
 
 
@@ -709,9 +711,220 @@ int main(void)
 
 ## select()模型
 
+
+
 ### 特点与原理
 
-解决基本C/S模型中，accept()与recv()函数傻等的问题，与多个客户端同时通信。
+**特点**：select模型用于服务端，客户端代码不变，解决基本C/S模型中，accept()与recv()函数傻等的问题(select本身是执行阻塞的)，实现与多个客户端链接与多个客户端同时通信。
+
+**原理**：将所有SOCKET装如一个数组，通过select函数遍历数组，将所有有响应的SOCKET返回。**当有客户端链接**时**服务端监听套接字**会有响应，我们调用accept函数处理；**当有响应的SOCKET为客户端的**，则说明有客户端通信，调用send或recv函数。
+
+
+
+**fd_set结构体**
+
+为什么使用它--因为select函数的参数需要该结构体，所以我们使用它的成员来储存SOCKET
+
+```c
+typedef struct fd_set {
+  u_int  fd_count;
+  SOCKET fd_array[FD_SETSIZE];
+} fd_set, FD_SET, *PFD_SET, *LPFD_SET;
+```
+
+**成员一**为无符号整型，用来记录集合中有响应的SOCKET数量
+
+**成员二**为储存SOCKET的集合，`FD_SETSIZE`为宏，值为64，我们可以通过在套接字头文件前使用 `define`重新定义大小
+
+
+
+**四个操作fd_set结构体的参数宏**
+
+`FD_ZERO`：参数为fd_set结构体地址，将结构体内数组初始化(其实就是将fd_count初始化为0)
+
+示例： `FD_ZERO(&AllSockets);`
+
+`FD_SET`：向集合中添加一个SOCKET
+
+示例：`FD_SET(Socket, &AllSockets);`
+
+`FD_CLR`：集合中删除指定SOCKET
+
+示例：`FD_CLR(Socket, &AllSockets);`
+
+**注意：**在从集合中删除SOCKET后要记得释放掉SOCKET，不然会**内存泄漏**
+
+```c
+SOCKET Temp_Socket;
+Temp_Socket = AllSockets.fd_array[n];
+FD_CLR(AllSockets.fd_array[n], &AllSockets);
+closesocket(Temp_Socket);
+//现在看不懂没关系，后续学习中会明白
+```
+
+`FD_ISSET`：判断SOCKET是否在集合中，不在返回0，在返回非0
+
+示例：`FD_ISSET(Socket, &AllSockets);`
+
+
+
+**select函数原型**
+
+```c
+int WSAAPI select(
+  int           nfds,
+  fd_set        *readfds,
+  fd_set        *writefds,
+  fd_set        *exceptfds,
+  const timeval *timeout
+);
+```
+
+**参数一**仅用作兼容，我们不需要管它，填0即可
+
+**参数二**传入fd_set结构体，select函数将检查是否有可读SOCKET，并返回
+
+**原理**：我们将含SOCKET集合的结构体作为参数，select将其投放给系统，系统将有响应的SOCKET返回到原数组，只剩下有响应的SOCKET，然后我们可以根据SOCKET的不同，进行不同处理
+
+**参数三**传入类型相同，用于检查是否有可写SOCKET，系统将可以被发送消息的SOCKET返回到原数组，一般正常链接了我们随时可以发送消息，而不是需要等到有响应才可以发送，所以我们用的不是特别多
+
+**参数四**传入类型相同，用于检查 SOCKET的异常错误，返回有异常的
+
+```c
+getsockopt(socket, SOL_SOCKET, SO_ERROR, buf, buflen); //得到错误码
+```
+
+**参数五**为最大等待时间，select为执行阻塞，需要设置等待时间，当客户端SOCKET集合无响应时会等待
+
+两个都赋值0，则此时select为非阻塞，无函数等待时间，两个都赋值NULL则完全阻塞成为傻等
+
+
+
+**timeval结构体**
+
+```c
+typedef struct timeval {
+  long tv_sec;
+  long tv_usec;
+} TIMEVAL, *PTIMEVAL, *LPTIMEVAL;
+```
+
+**成员一**以秒单位
+
+**成员二**以毫秒为单位
+
+```c
+struct timeval secondtime;
+secondtime.tv_sec = 3;
+secondtime.tv_usec = 4;
+//等待时间为3秒4微秒
+```
+
+
+
+**select函数返回值**
+
+- `0`，客户端SOCKET无反应，我们continue就行
+- `大于0`，有客户端响应
+- `SOCKET_ERROR`，错误，使用 `WSAGetLastError()`函数得到错误代码
+
+
+
+### 代码实现
+
+```c
+//上方代码与C/S模型相同
+fd_set AllSockets;
+FD_ZERO(&AllSockets); //创建并初始化结构体
+FD_SET(ServerSocket, &AllSockets); //将服务端监听SOCKET放入数组
+
+struct timeval seconds;
+seconds.tv_sec = 3;
+seconds.tv_usec = 0; //设置select函数等待时间
+
+while(1){
+	fd_set ReadSockets = AllSockets; //因为select函数会改变传入的结构体，不能改变原来的SOCKET集合
+        int select_return = select(0, &ReadSockets, NULL, NULL, &seconds);
+
+        if(select_return == 0){ //无客户端响应
+            continue;
+        } else if(select_return > 0){ //有客户端响应
+            
+            for(int n = 0; n < ReadSockets.fd_count; ++n){
+                
+                if(ReadSockets.fd_array[n] == server_socket){ //检查是否为服务端SOCKET
+                    SOCKET SocketClient = accept(server_socket, NULL, NULL); //接受客户端链接
+                    if(SocketClient == INVALID_SOCKET){ //错误处理
+                        continue;
+                    }
+                    FD_SET(SocketClient, &AllSockets); //将建立连接的客户端SOCKET装入结构体数组成员中，用于后续的响应监测
+                    
+                } else {
+                    char Msg[1500] = {0};
+                    int recv_return = recv(ReadSockets.fd_array[n], Msg, 1499, 0); //接收客户端消息
+                    if(recv_return == 0){
+                        printf("客户端下线\n");
+                    } else if(recv_return > 0){
+                        printf("%s\n", Msg);
+                    } else {
+                        printf("ERROR 客户端强制下线\n");
+                        SOCKET socketTemp = ReadSockets.fd_array[n];
+                        FD_CLR(ReadSockets.fd_array[n],&AllSockets); //移除下线SOCKET
+                        closesocket(socketTemp);
+                    }
+                    
+                } // else
+                
+            } // for
+            
+        } else { // 发生错误
+            printf("发生错误! 错误代码: %d\n", WSAGetLastError());
+        }
+        
+    } // while
+
+    for(int n = 0; n < AllSockets.fd_count; ++n){
+        SOCKET socketTemp = AllSockets.fd_array[n];
+        closesocket(socketTemp);
+    } //最后千万别忘了释放SOCKET集合，不然会内存泄漏
+    WSACleanup();
+    //清理网络库
+```
+
+
+
+**关于一些代码的解释**
+
+刚开始定义 `fd_set`结构体，我们装入监听客户端链接的服务端SOCKET，并将结构体作为参数传入`select`函数，**若有客户端链接时，服务端监听的SOCKET会有响应**，被返回出来，此时`fd_set`结构体的`fd_count`成员值为`1`，表明有一个有响应的SOCKET。此时我们可以使用`accept`函数进行与客户端的链接并创建存储客户端信息的SOCKET，并将其装入原SOCKET集合中，以此来用`select`监听其是否会有后续的响应，若有响应则表明有该客户端发来的消息，我们使用`recv`来接收。
+
+若客户端下线则我们需要将其从原SOCKET集合中移除，并使用`closesocket()`释放
+
+
+
+**关于参数三**，只要与客户端链接了，那该客户端SOCKET就是可写的，不一定需要该参数决定。如果我们向参数三传入AllSockets的副本，其中的ServerSocket不会对返回的数组成员造成影响，并且，只要有客户端链接成功，参数三返就一直是有响应的，select函数的返回值就**永远大于0**
+
+
+
+**参数四** 用于处理异常SOCKET，异常条件较苛刻，我们一般不会遇到所以用不上
+
+
+
+### 模型总结
+
+1. 创建SOCKET集合
+2. select()遍历
+3. 处理
+   1. 返回0 - 无响应，继续遍历
+   2. 大于0 - 分类处理
+   3. SOCKET_ERROR
+
+
+
+select函数是阻塞的
+
+1. 不等待 - 执行阻塞（原因：select函数遍历SOCKET集合需要时间）
+2. 半等待 - 执行阻塞+软阻塞
+3. 全等待 - 执行阻塞+硬阻塞（傻等）
 
 
 
@@ -734,3 +947,4 @@ int main(void)
 # 完结
 
 本教程到此结束，你学废了吗？有问题的小伙伴们欢迎在评论区友好交流。
+
