@@ -889,6 +889,8 @@ while(1){
     } //最后千万别忘了释放SOCKET集合，不然会内存泄漏
     WSACleanup();
     //清理网络库
+
+	return 0;
 ```
 
 
@@ -928,7 +930,91 @@ select函数是阻塞的
 
 
 
+### 控制台关闭事件
+
+当我们直接关闭Server程序窗口时，很可能不会释放所有SOCKET与关闭网络库，我们可以请求操作系统监视我们的窗口，当我们点`×`关闭窗口时，系统可以调用我们的函数释放数组与关闭网络库。(钩子事件)
+
+
+
+**SetConsoleCtrlHandler 函数**
+
+**函数原型**
+
+```c
+BOOL WINAPI SetConsoleCtrlHandler(
+  _In_opt_ PHANDLER_ROUTINE HandlerRoutine,
+  _In_     BOOL             Add
+);
+```
+
+
+
+**函数使用**
+
+```c
+SetConsoleCtrlHandler(function_name, TRUE);
+```
+
+**参数一**为我们需要调用的自定义的函数名-**回调函数名**，回调函数需要在该函数使用前定义
+
+**参数二**可填**TRUE**和**FALSE**，当收到事件的时候，**HandlerRoutine-回调函数**可以选择处理，或者简单的忽略。如果回调函数选择忽略，函数返回FALSE，系统将处理下一个钩子程序。如果处理消息，程序在处理完消息后应该返回TRUE。即填TRUE会调用我们的函数，FALSE不会
+
+
+
+**HandlerRoutine 回调函数**
+
+回调函数为被系统调用的函数
+
+
+
+**函数原型**
+
+```c
+BOOL WINAPI HandlerRoutine(
+  _In_ DWORD dwCtrlType // _In_ 只起说明作用表明为传入，填入参数时可去掉
+);
+```
+
+
+
+**实际使用演示**
+
+```c
+fd_set AllSockets; //定义为全局对象
+
+BOOL Console_Shutdown(DWORD dwCtrlType)
+{
+    switch(dwCtrlType){
+        case CTRL_CLOSE_EVENT: 
+            for(int n = 0; n < AllSockets.fd_count; ++n){
+                SOCKET socketTemp = AllSockets.fd_array[n];
+                closesocket(socketTemp);
+            }
+            WSACleanup();
+            break;
+        	//关闭窗口时，释放SOCKET与清理网络库处理
+        default:
+            break;
+    }
+
+    return TRUE;
+} //回调函数定义
+
+int main(void)
+{
+    SetConsoleCtrlHandler(Console_Shutdown, TRUE); //系统监视
+    ...
+    return 0;
+}
+```
+
+
+
 ## 事件选择模型
+
+
+
+
 
 
 
