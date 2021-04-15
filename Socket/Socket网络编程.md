@@ -982,7 +982,7 @@ BOOL WINAPI HandlerRoutine(
 ```c
 fd_set AllSockets; //定义为全局对象
 
-BOOL Console_Shutdown(DWORD dwCtrlType)
+bool Console_Shutdown(DWORD dwCtrlType)
 {
     switch(dwCtrlType){
         case CTRL_CLOSE_EVENT: 
@@ -1013,6 +1013,33 @@ int main(void)
 ## 事件选择模型
 
 
+
+**Windows消息机制与事件机制**
+
+**消息机制**：核心 - 消息队列（按操作顺序先入先出队列），用户操作产生消息，由计算机放入队列，然后被我们依次处理。消息队列由计算机创建与维护，我们无法干涉和改变，只能做调用，根据消息做分类处理。异步选择模型基于消息机制。
+
+
+
+**事件机制**：核心 - 事件集合（无顺序），事件由我们自己调用API创建，需要多少创建多少，给每个操作绑定事件（相当于给每个事件绑定ID），每个事件的检测顺序由程序员决定（事件集合由我们自己创建，我们可以将事件装入数组等），并将事件投递给系统监视，系统会根据我们创建集合的事件顺序依次检测，不能无限创建，太多系统处理不来。
+
+
+
+**事件选择模型的处理逻辑**
+
+整体逻辑与select模型差不多，核心函数为**`WSAEventSelect()`**
+
+
+
+1. 创建一个事件对象 **`WSACreateEvent()`**
+2. 给每个事件对象绑定SOCKET以及对应操作 `accept、read、close等`并投递给操作系统，然后就不用管了，系统自动监管 **`WSAEventSelect()`**-绑定加投递功能
+3. 查看事件是否有信号 **`WSAWaitForMultipleEvents()`**
+4. 有信号就分类处理 **`WSAEnumNetworkEvents()`**
+
+
+
+### 代码实现
+
+开始监听及以前代码与基本C\S模型相同
 
 
 
