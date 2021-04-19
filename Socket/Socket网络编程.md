@@ -126,7 +126,7 @@ if(wsas_return != 0){
                 "${file}",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
-                "-lwsock32"
+                "-lws2_32"
             ],
 ```
 
@@ -1037,11 +1037,426 @@ int main(void)
 
 
 
+**函数介绍**
+
+
+
+**WSACreateEvent函数**
+
+
+
+**函数语法**
+
+```c
+WSAEVENT WSAAPI WSACreateEvent(); //WSAAPI为调用约定，与我们基本没关系，去掉没影响
+```
+
+
+
+**无参数**
+
+
+
+**返回值**
+
+没有错误返回事件**对象句柄**（相当于ID，每个事件独立），否则返回值为**WSA_INVALID_EVENT**，获取错误信息使用 `WSAGetLastError()`
+
+
+
+句柄（事件对象）是一种**内核对象**，由操作系统在内核申请、访问，我们不能定位其内容也无法修改；不用了要用函数释放，不然会造成内核内存泄漏，与内存泄漏不同，内存泄漏只需关闭程序即可回收，而内核内存泄漏只能重启解决。Socket就是一种内核对象。
+
+
+
+**WSACloseEvent函数**
+
+
+
+**函数原型**
+
+用于关闭事件对象，不用就要释放
+
+```c
+BOOL WSAAPI WSACloseEvent(
+  WSAEVENT hEvent
+);
+```
+
+
+
+**参数介绍**
+
+需要关闭的事件对象名
+
+
+
+**返回值**
+
+成功为TRUE，失败为FALSE，获取错误信息使用 `WSAGetLastError()`
+
+
+
+**WSAEventSelect函数**
+
+给事件绑定SOCKET与操作码（用户操作事件），并投递给操作系统
+
+
+
+**函数原型**
+
+```c
+int WSAAPI WSAEventSelect(
+  SOCKET   s,
+  WSAEVENT hEventObject,
+  long     lNetworkEvents
+);
+```
+
+
+
+**参数介绍**
+
+**参数一**为被绑定的SOCKET，每个SOCKET都要被绑定事件
+
+**参数二**为事件对象，与参一绑定
+
+**参数三**为具体事件 `FD_ACCEPT等`，可以使用**位或**进行多个事件绑定，当有事件发生时，会产生信号
+
+
+
+| **FD_ACCEPT**    | 与服务器SOCKET绑定，有客户端链接时有响应                     |
+| ---------------- | ------------------------------------------------------------ |
+| **FD_READ**      | **与客户端SOCKET绑定，有客户端消息时有响应**                 |
+| **FD_CLOSE**     | **与客户端SOCKET绑定，有客户端下线(强制或正常)时有响应**     |
+| **FD_WRITE**     | **与客户端SOCKET绑定，在accept后立即产生该信号，客户端链接成功即可发消息** |
+| **FD_CONNECT**   | **用于客户端，服务器端用不到，给服务器SOCKET绑定**           |
+| **0**            | **取消事件监视**                                             |
+| **FD_OOB**       | **一般不使用**                                               |
+| **FD_QOS**       | **套接字服务质量变化通知**                                   |
+| **FD_GROUP_QOS** | **没有具体意义，保留词**                                     |
+
+给原有事件对象再次绑定事件会覆盖原有事件
+
+
+
+**返回值**
+
+成功返回0，失败返回`SOCKET_ERROR`
+
+
+
+**WSAWaitForMultipleEvents函数**
+
+询问发生信号的事件
+
+
+
+**函数原型**
+
+```c
+DWORD WSAAPI WSAWaitForMultipleEvents(
+  DWORD          cEvents,
+  const WSAEVENT *lphEvents,
+  BOOL           fWaitAll,
+  DWORD          dwTimeout,
+  BOOL           fAlertable
+);
+```
+
+
+
+`DWORD`为无符号长整型
+
+
+
+**参数介绍**
+
+**参数一**为事件个数
+
+**参数二**为事件数组首地址
+
+**参数三**为事件等待方式，TRUE-阻塞，等到所有事件都有信号才返回，FALSE，任何一个有信号立即返回
+
+**参数四**为超时间隔，以毫秒为单位，一直等待宏 **WSA_INFINITE**
+
+**参数五**为选择模型，TRUE为**重叠IO模型**使用的，FALSE为**事件选择模型**使用
+
+
+
+**返回值**
+
+参数三为TRUE返回，返回值指示已发出所有指定的事件对象的信号
+
+参数三为FALSE返回，返回值减去**WSA_WAIT_EVENT_0**表示满足等待信号的事件对象的数组索引（下标）
+
+参数五为TRUE返回，**WSA_WAIT_IO_COMPLETION**
+
+超时返回，**WSA_WAIT_TIMEOUT**，`continue`即可
+
+失败返回，**WSA_WAIT_FAILED**
+
+
+
+**WSAEnumNetworkEvents函数**
+
+列举事件，获取事件类型，并将信号重置
+
+
+
+**函数原型**
+
+```c
+int WSAAPI WSAEnumNetworkEvents(
+  SOCKET             s,
+  WSAEVENT           hEventObject,
+  LPWSANETWORKEVENTS lpNetworkEvents
+);
+```
+
+
+
+**参数介绍**
+
+**参数一**为SOCKET
+
+**参数二**为对应事件
+
+**参数三**装触发类型的事件，是一个结构体指针 `WSANETWORKEVENTS`
+
+**结构体原型**
+
+```c
+typedef struct _WSANETWORKEVENTS {
+  long lNetworkEvents;
+  int  iErrorCode[FD_MAX_EVENTS];
+} WSANETWORKEVENTS, *LPWSANETWORKEVENTS;
+```
+
+结构体成员一为**指示发生了哪些FD_XXX网络事件**
+
+成员二为**错误码数组**，包含与对应于事件的比特中的位置的数组索引相关联的任何错误代码**lNetworkEvents**。诸如FD_READ_BIT和FD_WRITE_BIT之类的标识符可用于索引**iErrorCode**数组
+
+
+
+**返回值**
+
+成功返回0，失败返回 `SOCKET_ERROR`
+
+
+
+**事件分类处理逻辑**
+
+根据事件的响应的不同进行分类处理
+
+
+
 ### 代码实现
 
 开始监听及以前代码与基本C\S模型相同
 
+```c
+#include <stdio.h>
+#include <string.h>
+#include <winsock2.h>
+#pragma comment(lib, "ws2_32.lib")
+//引用头文件与网络库
 
+typedef struct event_socket_set {
+    SOCKET socket_all[64];
+    WSAEVENT event_all[64];
+    unsigned int count;
+} event_socket_set;
+
+fd_set AllSockets;
+//创建存放SOCKET与事件对象的容器，因为我们需要对每个SOCKET绑定相应的事件
+event_socket_set es_set = {{0}, {0}, 0};
+
+
+BOOL WINAPI Console_Shutdown(DWORD dwCtrlType)
+{
+    switch(dwCtrlType){
+        case CTRL_CLOSE_EVENT: 
+            for(int n = 0; n < es_set.count; ++n){
+            closesocket(es_set.socket_all[n]);
+            WSACloseEvent(es_set.event_all[n]);
+        }
+        WSACleanup();
+        break;
+    }
+
+    return TRUE;
+}
+
+int main(void)
+{
+
+    SetConsoleCtrlHandler(Console_Shutdown, TRUE);
+
+    WORD WSVersion = (2, 2);
+	WSADATA wsadata;
+    int wsas_return = WSAStartup(WSVersion, &wsadata);
+    if(wsas_return != 0){
+        printf("初始化网络库失败! 请检查网络库，或者重启电脑\n");
+    }
+    //初始化网络库
+    
+    SOCKET server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if(server_socket == INVALID_SOCKET){
+        printf("创建socket失败! 错误代码:");
+        int error = WSAGetLastError();
+        printf("%d\n",error);
+        WSACleanup();
+        return 1;
+    }
+    //创建本地socket
+    
+    struct sockaddr_in bind_info;
+    bind_info.sin_family = AF_INET;
+    bind_info.sin_port = htons(2333);
+    bind_info.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+    int bind_return = bind(server_socket, (const struct sockaddr *)&bind_info, sizeof(bind_info));
+    if(bind_return != 0){
+        printf("BIND ERROR! 错误代码: %d\n",WSAGetLastError());
+        closesocket(server_socket);
+        WSACleanup();
+        return 1;
+    }
+    //绑定本地ip与端口
+    
+    int listen_return = listen(server_socket, SOMAXCONN);
+    if(listen_return != 0){
+        printf("LISETEN ERROR! 错误代码: %d\n",WSAGetLastError());
+        closesocket(server_socket);
+        WSACleanup();
+        return 1;
+    }
+    printf("Listening...\n");
+    //监听客户端链接
+
+
+    //创建事件
+    WSAEVENT EventServer = WSACreateEvent();
+    //返回值处理
+    if(EventServer == WSA_INVALID_EVENT){
+        printf("CREATE EVENT ERROR! 错误代码: %d\n",WSAGetLastError());
+        closesocket(server_socket);
+        WSACleanup();
+        return 0;
+    }
+
+    //事件绑定与投递
+    int EventSelect_return = WSAEventSelect(server_socket, EventServer, FD_ACCEPT | FD_WRITE | FD_READ);
+    if(EventSelect_return == SOCKET_ERROR){
+        printf("ERROR! 错误代码: %d\n",WSAGetLastError());
+        WSACloseEvent(EventServer);
+        closesocket(server_socket);
+        WSACleanup();
+        return 0;
+    }
+
+    es_set.socket_all[es_set.count] = server_socket;
+    es_set.event_all[es_set.count] = EventServer;
+    es_set.count++;
+    //添加到容器中
+
+    while(1){
+        DWORD Wait_return = WSAWaitForMultipleEvents(es_set.count, es_set.event_all, FALSE, 200, FALSE);
+        //函数错误
+        if(Wait_return == WSA_WAIT_FAILED){
+            printf("WAIT ERROR! 错误代码: %d\n",WSAGetLastError());
+            break;
+        }
+        //超时
+        if(Wait_return == WSA_WAIT_TIMEOUT){
+            continue;
+        }
+        DWORD event_index = Wait_return - WSA_WAIT_EVENT_0;
+
+        //得到下标对应事件
+        WSANETWORKEVENTS NetworkEvents;
+        int n_t_return = WSAEnumNetworkEvents(es_set.socket_all[event_index], es_set.event_all[event_index], &NetworkEvents);
+        if(n_t_return == SOCKET_ERROR){
+            printf("GETINDEX ERROR! 错误代码: %d\n",WSAGetLastError());
+            break;
+        }
+
+        if(NetworkEvents.lNetworkEvents & FD_ACCEPT){
+            if(NetworkEvents.iErrorCode[FD_ACCEPT_BIT] == 0){ //等于0时为无错误码情况，正常处理
+                SOCKET ClientSocket = accept(es_set.socket_all[event_index], NULL, NULL);
+                if(ClientSocket == INVALID_SOCKET){
+                    continue;
+                }
+                //给客户端SOCKET绑定事件
+                WSAEVENT ClientEvent = WSACreateEvent();
+                if(ClientEvent == WSA_INVALID_EVENT){
+                    closesocket(ClientSocket);
+                    continue;
+                }
+                //投递给系统监视
+                if( WSAEventSelect(ClientSocket, ClientEvent, FD_READ | FD_CLOSE | FD_WRITE) == SOCKET_ERROR){
+                    closesocket(ClientSocket);
+                    WSACloseEvent(ClientEvent);
+                    continue;
+                }
+
+                //将链接的客户端SOCKET装入数组集合进行后续监视
+                es_set.socket_all[es_set.count] = ClientSocket;
+                es_set.event_all[es_set.count] = ClientEvent;
+                es_set.count++;
+                printf("Client Connect Success\n");
+            } else {
+                continue;
+            }
+        }
+        
+        //根据客户端信号进行分类处理
+        if(NetworkEvents.lNetworkEvents & FD_WRITE){
+            if(NetworkEvents.iErrorCode[FD_WRITE_BIT] == 0){
+                if(send(es_set.socket_all[event_index], "CONNECT SUCCESS", strlen("CONNECT SUCCESS"), 0) == SOCKET_ERROR){
+                    printf("SEND ERROR! 错误代码: %d\n",WSAGetLastError());
+                }
+            } else {
+                printf("CLIENT SOCKET ERROR! 错误代码: %d\n",NetworkEvents.iErrorCode[FD_WRITE_BIT]);
+            }
+        }
+
+        if(NetworkEvents.lNetworkEvents & FD_READ){
+            if(NetworkEvents.iErrorCode[FD_READ_BIT] == 0){
+                char rec_msg[1500] = {0};
+                if(recv(es_set.socket_all[event_index], rec_msg, 1499, 0) == SOCKET_ERROR){
+                    printf("RECV ERROR! 错误代码: %d\n",WSAGetLastError());
+                    continue;
+                }
+                printf("%s\n", rec_msg);
+            } else {
+                printf("CLIENT SOCKET ERROR! 错误代码: %d\n",NetworkEvents.iErrorCode[FD_READ_BIT]);
+                continue;
+            }
+        }
+
+        if(NetworkEvents.lNetworkEvents & FD_CLOSE){
+            if(NetworkEvents.iErrorCode[FD_CLOSE_BIT] == 0){
+                //清理下线客户端SOCKET与事件
+                closesocket(es_set.socket_all[event_index]);
+                es_set.socket_all[event_index] = es_set.socket_all[es_set.count-1];
+                //将已关闭SOCKET的位置用最后一个有效SOCKET替补，并将有效个数减一，避免移动后面所有SOCKET的情况，下同
+                WSACloseEvent(es_set.event_all[event_index]);
+                es_set.event_all[event_index] = es_set.event_all[es_set.count-1];
+                es_set.count--;
+            }
+        }
+
+    }
+
+	for(int n = 0; n < es_set.count; ++n){
+		closesocket(es_set.socket_all[n]);
+		WSACloseEvent(es_set.event_all[n]);
+	}
+    WSACleanup();
+	//清理SOCKET、事件与网络库
+    
+    return 0;
+}
+```
 
 
 
