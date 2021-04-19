@@ -130,6 +130,8 @@ if(wsas_return != 0){
             ],
 ```
 
+注意不要链接`ws32`库，这个库较老，无法正常使用事件选择模型的函数
+
 
 
 ## 创建套接字-socket()函数与返回值
@@ -1243,12 +1245,6 @@ typedef struct _WSANETWORKEVENTS {
 
 
 
-**事件分类处理逻辑**
-
-根据事件的响应的不同进行分类处理
-
-
-
 ### 代码实现
 
 开始监听及以前代码与基本C\S模型相同
@@ -1359,6 +1355,7 @@ int main(void)
     //添加到容器中
 
     while(1){
+        //操作系统监控事件与该函数是异步的，这个函数只是隔一段时间向系统获取事件的情况
         DWORD Wait_return = WSAWaitForMultipleEvents(es_set.count, es_set.event_all, FALSE, 200, FALSE);
         //函数错误
         if(Wait_return == WSA_WAIT_FAILED){
@@ -1434,15 +1431,14 @@ int main(void)
         }
 
         if(NetworkEvents.lNetworkEvents & FD_CLOSE){
-            if(NetworkEvents.iErrorCode[FD_CLOSE_BIT] == 0){
-                //清理下线客户端SOCKET与事件
-                closesocket(es_set.socket_all[event_index]);
-                es_set.socket_all[event_index] = es_set.socket_all[es_set.count-1];
-                //将已关闭SOCKET的位置用最后一个有效SOCKET替补，并将有效个数减一，避免移动后面所有SOCKET的情况，下同
-                WSACloseEvent(es_set.event_all[event_index]);
-                es_set.event_all[event_index] = es_set.event_all[es_set.count-1];
-                es_set.count--;
-            }
+            printf("Client ShutDown\n");
+            //清理下线客户端SOCKET与事件
+            closesocket(es_set.socket_all[event_index]);
+            es_set.socket_all[event_index] = es_set.socket_all[es_set.count-1];
+            //将已关闭SOCKET的位置用最后一个有效SOCKET替补，并将有效个数减一，避免移动后面所有SOCKET的情况，下同
+            WSACloseEvent(es_set.event_all[event_index]);
+            es_set.event_all[event_index] = es_set.event_all[es_set.count-1];
+            es_set.count--;
         }
 
     }
@@ -1460,7 +1456,124 @@ int main(void)
 
 
 
+**事件分类处理逻辑**
+
+根据事件的响应的不同进行分类处理，下面展示的代码为`if`处理，现在讨论`switch`以及`if-else if`处理的问题，else-if本质上与switch相似，当有多个事件有信号时，else-if只能处理一个满足条件，即使后面的条件依然为真，switch则更严重
+
+
+
+**else-if示例与解释**
+
+```c
+if(NetworkEvents.lNetworkEvents & FD_WRITE){
+            if(NetworkEvents.iErrorCode[FD_WRITE_BIT] == 0){
+                if(send(es_set.socket_all[event_index], "CONNECT SUCCESS", strlen("CONNECT SUCCESS"), 0) == SOCKET_ERROR){
+                    printf("SEND ERROR! 错误代码: %d\n",WSAGetLastError());
+                }
+            } else {
+                printf("CLIENT SOCKET ERROR! 错误代码: %d\n",NetworkEvents.iErrorCode[FD_WRITE_BIT]);
+            }
+        }
+
+else if(NetworkEvents.lNetworkEvents & FD_READ){
+    if(NetworkEvents.iErrorCode[FD_READ_BIT] == 0){
+        char rec_msg[1500] = {0};
+        if(recv(es_set.socket_all[event_index], rec_msg, 1499, 0) == SOCKET_ERROR){
+            printf("RECV ERROR! 错误代码: %d\n",WSAGetLastError());
+            continue;
+        }
+        printf("%s\n", rec_msg);
+    } else {
+        printf("CLIENT SOCKET ERROR! 错误代码: %d\n",NetworkEvents.iErrorCode[FD_READ_BIT]);
+        continue;
+    }
+}
+
+else if(NetworkEvents.lNetworkEvents & FD_CLOSE){
+    printf("Client ShutDown\n");
+    //清理下线客户端SOCKET与事件
+    closesocket(es_set.socket_all[event_index]);
+    es_set.socket_all[event_index] = es_set.socket_all[es_set.count-1];
+    //将已关闭SOCKET的位置用最后一个有效SOCKET替补，并将有效个数减一，避免移动后面所有SOCKET的情况，下同
+    WSACloseEvent(es_set.event_all[event_index]);
+    es_set.event_all[event_index] = es_set.event_all[es_set.count-1];
+    es_set.count--;
+}
+else {
+    
+}
+```
+
+当客户端链接并发送消息时，在`WSAEventSelect`函数内发生两个信号`READ`、`WRITE`，由`FD_XX`定义得，一个为01，一个为10，两个位和为11，即为3，NetworkEvents.lNetworkEvents值为3，else-if为多选一匹配，在后面匹配时先匹配`FD_WRITE`，然后就不执行后面判断了。有小问题，可以采用。
+
+
+
+```c
+switch (NetworkEvents.lNetworkEvents){
+        case FD_ACCEPT:
+        ...
+        case FD_WRITE:
+        ...
+        case FD_READ:
+        ...
+        case FD_CLOSE:
+        ...
+}
+```
+
+对于`switch`，首先有客户端链接时，NetworkEvents.lNetworkEvents值为8，与FD_ACCEPT匹配，正常处理，当当有多个信号时，如`READ`、`WRITE`，NetworkEvents.lNetworkEvents值为3，不与任何信号匹配，出现错误。所以不建议使用switch方法分类处理信号。
+
+
+
+### 有序优化之变态点击
+
+解决`WSAWaitForMultipleEvents`按照我们放入es_set.event_all事件集合的事件顺序去依次遍历，而不是根据事件发生的顺序去遍历，查看有无事件被触发，而不管集合内事件发生的先后顺序，该函数一次只能处理一个事件信号，并返回下标最小事件下标，当其中一个信号一直发生时，后续事件将永远无法被处理的问题。
+
+这里只解决只有一个事件被处理的问题。
+
+```c
+while(1){
+    for(int nindex = 0;nindex < es_set.count;++nindex){
+        DWORD Wait_return = WSAWaitForMultipleEvents(1, es_set.event_all[nindex], FALSE, 0, FALSE);
+        if(WSA_WAIT_FAILED == Wait_return){
+            printf("ERROR! 错误代码: %d\n",WSAGetLastError());
+            continue;
+        }
+        if(WSA_WAIT_TIMEOUT == Wait_return){
+            continue;
+        }
+
+        //下面代码相同
+
+        //得到下标对应事件
+            WSANETWORKEVENTS NetworkEvents;
+            int n_t_return = WSAEnumNetworkEvents(es_set.socket_all[event_index], es_set.event_all[event_index], &NetworkEvents);
+            if(n_t_return == SOCKET_ERROR){
+                printf("GETINDEX ERROR! 错误代码: %d\n",WSAGetLastError());
+                break;
+            }
+
+            if(NetworkEvents.lNetworkEvents & FD_ACCEPT){
+                if(NetworkEvents.iErrorCode[FD_ACCEPT_BIT] == 0){ //等于0时为无错误码情况，正常处理
+                    SOCKET ClientSocket = accept(es_set.socket_all[event_index], NULL, NULL);
+                    if(ClientSocket == INVALID_SOCKET){
+                        continue;
+                    }
+                    //给客户端SOCKET绑定事件
+                    
+                    /*
+                    
+                    省略
+                    
+                    */
+}
+```
+
+
+
 ## 异步选择模型
+
+
 
 
 
