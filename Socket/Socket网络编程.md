@@ -1532,8 +1532,21 @@ switch (NetworkEvents.lNetworkEvents){
 这里只解决只有一个事件被处理的问题。
 
 ```c
+DWORD Wait_return = WSAWaitForMultipleEvents(es_set.count, es_set.event_all, FALSE, 0, FALSE);
+        //函数错误
+        if(Wait_return == WSA_WAIT_FAILED){
+            printf("WAIT ERROR! 错误代码: %d\n",WSAGetLastError());
+            break;
+        }
+        //超时
+        if(Wait_return == WSA_WAIT_TIMEOUT){
+            continue;
+        }
+DWORD event_index = Wait_return - WSA_WAIT_EVENT_0;
+//因为WSAWaitForMultipleEvents函数返回的是最小的有响应的下标，从该下标往后遍历会更加高效
+
 while(1){
-    for(int nindex = 0;nindex < es_set.count;++nindex){
+    for(int nindex = event_index;nindex < es_set.count;++nindex){
         DWORD Wait_return = WSAWaitForMultipleEvents(1, es_set.event_all[nindex], FALSE, 0, FALSE);
         if(WSA_WAIT_FAILED == Wait_return){
             printf("ERROR! 错误代码: %d\n",WSAGetLastError());
@@ -1569,11 +1582,279 @@ while(1){
 }
 ```
 
+还可以一组一组处理，使用结构体数组，和双重循环，还有一些细节的修改，由于字数原因，这里不做展示。
+
+这里只介绍下 `memset`函数，用于将目标区域设置为指定字符
+
+```c
+void *memset(
+   void *dest,
+   int c,
+   size_t count
+);
+```
+
+例子
+
+```c
+struct event_socket_set es_set[20];
+memset(es_set, 0, sizeof(event_socket_set)*20);
+//将所有空间赋值为0
+```
+
 
 
 ## 异步选择模型
 
 
+
+**逻辑**
+
+核心 - 消息队列，要使用消息队列先要创建窗口，操作系统为每个窗口创建一个消息队列并维护。
+
+模型实现步骤：
+
+1. 将SOCKET绑定在一个消息上并投递给系统，使用 `WSAAsyncSelect`函数
+2. 取消息分类处理，有操作就会有对应的消息
+
+**需要 `windows.h`头文件** ，**该模型只能用于windows**
+
+
+
+**窗口的创建**
+
+1. 创建窗口结构体 `WNDCLASSEX`
+2. 注册窗口结构体 `RegisterClassEX`
+3. 创建窗口 `CreateWindowEX`
+4. 显示窗口 `ShowWindow`
+5. 消息循环 `GetMessage、TranslateMessage、DispatchMessage`
+6. 回调函数 `CALLBACK`
+
+
+
+**WinMain应用程序入口点**
+
+每个Windows程序都包含一个名为**WinMain**或**wWinMain**的入口点函数，相当于控制台程序的**Main**函数
+
+
+
+**函数原型**
+
+```c
+int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow)
+{
+    return 0;
+}
+```
+
+**WINAPI**是调用约定。一个*调用约定*定义了一个函数从主叫方接收参数。
+
+
+
+**函数参数**
+
+**参数一：** **HINSTANCE**为实例句柄(ID)，就是该程序的ID或名字
+
+**参数二：**已不再使用，仅作兼容，之前用来跟踪应用程序的前一个实例，即程序的父亲的程序实例
+
+**参数三：** **PWSTR**为命令行参数，用于传递数据
+
+**参数四：** 指示是否将主应用程序窗口最小化，最大化或正常显示
+
+
+
+**WNDCLASSEX结构体**
+
+用于装窗口属性，这里带了后缀EX为扩展版本
+
+
+
+**结构体声明**
+
+```c
+typedef struct tagWNDCLASSEXA {
+  UINT      cbSize;
+  UINT      style;
+  WNDPROC   lpfnWndProc;
+  int       cbClsExtra;
+  int       cbWndExtra;
+  HINSTANCE hInstance;
+  HICON     hIcon;
+  HCURSOR   hCursor;
+  HBRUSH    hbrBackground;
+  LPCSTR    lpszMenuName;
+  LPCSTR    lpszClassName;
+  HICON     hIconSm;
+} WNDCLASSEXA, *PWNDCLASSEXA, *NPWNDCLASSEXA, *LPWNDCLASSEXA;
+```
+
+
+
+**窗口结构体设置**
+
+```c
+    WNDCLASSEX SW; //创建窗口结构体
+    SW.cbClsExtra = 0; //根据窗口类结构分配的额外字节数。系统将字节初始化为零。一般用不到，填0
+    SW.cbSize = sizeof(WNDCLASSEX); //窗口结构体大小
+    SW.cbWndExtra = 0; //窗口实例后要分配的额外字节数。系统将字节初始化为零.一般不用，填0。
+    SW.hbrBackground = NULL; //窗口颜色，默认为白
+    SW.hCursor = NULL; //设置光标形态
+    SW.hIcon = NULL; //左上角图标
+    SW.hIconSm = NULL; //最小化图标
+    SW.hInstance = hInstance; //实例句柄，填参数一 
+    SW.lpfnWndProc = xxxx; //填回调函数名字 
+    SW.lpszClassName = "SynSelect"; //当前窗口类的名字，随便起一个
+    SW.lpszMenuName =  NULL; //菜单
+    SW.style = CS_HREDRAW | CS_VREDRAW; //窗口风格
+    /*
+    CS_HREDRAW 水平刷新  CS_VREDRAW 垂直刷新
+    窗口改变时，需要重新绘制，不然窗口就无法正常显示
+    */
+```
+
+
+
+**RegisterClassEX函数**
+
+窗口结构体带EX这里就要带
+
+用于注册结构体
+
+**参数：**窗口结构体地址
+
+
+
+**CreateWindowEX函数**
+
+用于创建窗口
+
+
+
+**函数原型**
+
+```c
+HWND CreateWindowExW(
+  DWORD     dwExStyle,
+  LPCWSTR   lpClassName,
+  LPCWSTR   lpWindowName,
+  DWORD     dwStyle,
+  int       X,
+  int       Y,
+  int       nWidth,
+  int       nHeight,
+  HWND      hWndParent,
+  HMENU     hMenu,
+  HINSTANCE hInstance,
+  LPVOID    lpParam
+);
+```
+
+
+
+**参数一：** 窗口风格，这里用 `WS_EX_OVERLAPPEDWINDOW` 正常风格
+
+**参数二：** 窗口类名
+
+**参数三：** 窗口名字，自定
+
+**参数四：** 为窗口表面样式，这里用 ``WS_OVERLAPPEDWINDOW``，多个样式使用位或
+
+**参数五与六：**为窗口起始坐标
+
+**参数七与八：** 为窗口宽与高
+
+**参数九：**副(子)窗口，我们这里没有，填`NULL`
+
+**参数十：** 为菜单句柄，这里没有，填`NULL`
+
+**参数十一：** 窗口句柄，填 `hInstance`
+
+**参数十二：** 给回调函数传数据的参数，这里不需要，填`NULL`
+
+
+
+**返回值**
+
+返回值是新窗口的句柄
+
+
+
+**创建窗口**
+
+```c
+CreateWindow(WS_EX_OVERLAPPEDWINDOW, "SynSelect", "SynSelect_Test", WS_OVERLAPPEDWINDOW, 200, 600, 400, NULL, NULL, hInstance, NULL);
+```
+
+
+
+**ShowWindow函数**
+
+**参数一：** 要显示的窗口ID
+
+**参数二：** 显示方式，填`1`为正常显示，填 `0`为最小化显示，可以填主函数参数四，它默认为`1`
+
+
+
+**GetMessage函数**
+
+用于从消息队列中取消息
+
+**参数一：** 消息结构体地址
+
+**参数二：** 窗口句柄或`NULL`，填句柄，则只从指定窗口(ID)获取消息，一个应用程序可能会有多个窗口，填 `NULL`为从整个程序窗口获取消息
+
+**参数三与四：** 为消息范围，消息本质为宏是整数，都填0，为接收所有消息
+
+
+
+**TranslateMessage函数**
+
+翻译消息，对消息分类
+
+**参数为窗口结构体地址**
+
+
+
+**DispatchMessage函数**
+
+分类处理，调用回调函数
+
+**参数为窗口结构体地址**
+
+
+
+**回调函数**
+
+由系统调用
+
+```c
+LRESULT CALLBACK WinBack(HWND hwnd, UINT msgID, WPARAM wparam, LPARAM lparap)
+{
+    
+}
+```
+
+**LRESULT**为返回类型，本质为long型
+
+**CALLBACK**为调用约定
+
+**参数一：** 为窗口句柄
+
+**参数二：** 为消息ID
+
+**参数三：** 装SOCKET
+
+**参数四：** 装SOCKET具体事件与错误信息
+
+
+
+
+
+### 代码实现
+
+```c
+
+```
 
 
 
