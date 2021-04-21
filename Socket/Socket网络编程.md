@@ -50,6 +50,7 @@ Socket相当于一个电话，只需要知道另一个电话号码(另一端的�
 //引入头文件
 #pragma comment(lib, "ws2_32.lib")
 //引入网络库
+////////   注：MinGW并不支持该语句，需要在VsCode的task文件内添加链接库         ////////
 
 /*
 引入windows库的模板写法
@@ -1624,8 +1625,8 @@ memset(es_set, 0, sizeof(event_socket_set)*20);
 **窗口的创建**
 
 1. 创建窗口结构体 `WNDCLASSEX`
-2. 注册窗口结构体 `RegisterClassEX`
-3. 创建窗口 `CreateWindowEX`
+2. 注册窗口结构体 `RegisterClassEx`
+3. 创建窗口 `CreateWindowEx`
 4. 显示窗口 `ShowWindow`
 5. 消息循环 `GetMessage、TranslateMessage、DispatchMessage`
 6. 回调函数 `CALLBACK`
@@ -1665,7 +1666,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nC
 
 **WNDCLASSEX结构体**
 
-用于装窗口属性，这里带了后缀EX为扩展版本
+用于装窗口属性，这里带了后缀Ex为扩展版本
 
 
 
@@ -1714,9 +1715,9 @@ typedef struct tagWNDCLASSEXA {
 
 
 
-**RegisterClassEX函数**
+**RegisterClassEx函数**
 
-窗口结构体带EX这里就要带
+窗口结构体带Ex这里就要带
 
 用于注册结构体
 
@@ -1724,7 +1725,7 @@ typedef struct tagWNDCLASSEXA {
 
 
 
-**CreateWindowEX函数**
+**CreateWindowEx函数**
 
 用于创建窗口
 
@@ -1848,13 +1849,150 @@ LRESULT CALLBACK WinBack(HWND hwnd, UINT msgID, WPARAM wparam, LPARAM lparap)
 
 
 
-
-
-### 代码实现
+### 窗口实现
 
 ```c
+#include <stdio.h>
+#include <Windows.h>
 
+LRESULT CALLBACK WinBack(HWND hwnd, UINT msgID, WPARAM wparam, LPARAM lparap);
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
+{
+    WNDCLASSEX WS; //创建窗口结构体
+    WS.cbClsExtra = 0; //根据窗口类结构分配的额外字节数。系统将字节初始化为零。一般用不到，填0
+    WS.cbSize = sizeof(WNDCLASSEX); //窗口结构体大小
+    WS.cbWndExtra = 0; //窗口实例后要分配的额外字节数。系统将字节初始化为零.一般不用，填0。
+    WS.hbrBackground = NULL; //窗口颜色，默认为白
+    WS.hCursor = NULL; //设置光标形态
+    WS.hIcon = NULL; //左上角图标
+    WS.hIconSm = NULL; //最小化图标
+    WS.hInstance = hInstance; //实例句柄，填参数一 
+    WS.lpfnWndProc = WinBack; //填回调函数名字 
+    WS.lpszClassName = "SynSelect"; //当前窗口类的名字，随便起一个
+    WS.lpszMenuName =  NULL; //菜单
+    WS.style = CS_HREDRAW | CS_VREDRAW; //窗口风格
+    /*
+    CS_HREDRAW 水平刷新  CS_VREDRAW 垂直刷新
+    窗口改变时，需要重新绘制，不然窗口就无法正常显示
+    */
+
+   //注册窗口
+   RegisterClassEx(&WS);
+
+   //创建窗口
+   HWND hwnd = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW, "SynSelect", "SynSelect_Test", WS_OVERLAPPEDWINDOW, 200, 200, 600, 400, NULL, NULL, hInstance, NULL);
+
+    //显示窗口
+    ShowWindow(hwnd, 1);
+
+    //重绘（刷新）窗口
+    UpdateWindow(hwnd);
+
+    //消息循环
+    MSG msg; //创建消息结构体
+    while(GetMessage(&msg, NULL, 0, 0)){
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return 0;
+}
+
+LRESULT CALLBACK WinBack(HWND hwnd, UINT msgID, WPARAM wparam, LPARAM lparap)
+{
+    switch(msgID){
+        case WM_CREATE: //窗口 初始化产生，只产生一次，可以放用于初始化的代码
+            break;
+        case WM_DESTROY: //这里WM_XX就是消息
+            PostQuitMessage(0); //传递退出消息，没有的话窗口关闭不了
+            break;
+    }
+
+    return DefWindowProc(hwnd, msgID, wparam, lparap); //对没有处理的消息默认处理
+}
 ```
+
+
+
+开始监听及以前代码与基本C\S模型相同
+
+
+
+核心函数 `WSAAsyncSelect`，作用是给SOCEKT绑定消息，并投递给系统
+
+**函数原型**
+
+```c
+int WSAAsyncSelect(
+  SOCKET s,
+  HWND   hWnd,
+  u_int  wMsg,
+  long   lEvent
+);
+```
+
+
+
+**参数介绍**
+
+**参数一：** SOCKET
+
+**参数二：** 窗口句柄
+
+**参数三：** 网络事件发生时要接收的消息，消息本身就是一个数，消息对应的数是唯一的
+
+为防止与系统已定义的消息冲突，使用宏 `WM_USER`，这个宏以下的数为系统消息所占用，以上的我们可以自己使用
+
+自定义消息，可以使用 `#define` 创建宏
+
+```c
+#define UM_ASYNSELECT WM_USER+1
+//自定义消息一般以U开头
+```
+
+**参数四：** 给SOCKET绑定操作，与事件选择模型一样
+
+
+
+如果SOCKET填的是服务器SOCKET，将其与消息绑定，有客户端链接时，消息就会被触发，然后我们捕获与处理
+
+
+
+**返回值**
+
+出错返回`SOCKET_ERROR`，成功返回`0`
+
+
+
+**MessageBox函数**
+
+显示一个模式对话框
+
+
+
+**函数原型**
+
+```c
+int MessageBox(
+  HWND    hWnd,
+  LPCTSTR lpText,
+  LPCTSTR lpCaption,
+  UINT    uType
+);
+```
+
+
+
+**参数介绍**
+
+**参数一：** 要创建的消息框的所有者窗口的句柄。填句柄，则为该窗口的子窗口。如果此参数为**NULL**，则消息框为独立窗口
+
+**参数二：** 要显示的消息
+
+**参数三：** 窗口标题
+
+**参数四：** 窗口风格
 
 
 
