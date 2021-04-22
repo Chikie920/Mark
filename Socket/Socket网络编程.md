@@ -1,5 +1,5 @@
 ---
-title: Socket网络编程
+                                title: Socket网络编程
 date: 2021-01-23 21:37:02
 tags: [Socket网络编程,C]
 comments: true
@@ -1996,7 +1996,401 @@ int MessageBox(
 
 
 
+**TextOut函数**
+
+在窗口上输出文本
+
+
+
+**函数原型**
+
+```c
+BOOL TextOutA(
+  HDC    hdc,
+  int    x,
+  int    y,
+  LPCSTR lpString,
+  int    c
+);
+```
+
+
+
+**参数介绍**
+
+**参数一：** 窗口显示区（去掉窗口名字显示的那个头部框的部分）的句柄
+
+使用 `GetDC函数`得到该句柄，参数为窗口句柄，`HDC`类型
+
+**参数二与三：** 显示字符串的位置
+
+**参数四：** 要输出的字符串
+
+**参数五：** 字符串长度
+
+
+
+### 代码实现
+
+```c
+#include <stdio.h>
+#include <winsock2.h>
+#include <Windows.h>
+#include <string.h>
+
+#define UM_ASYNSELECT WM_USER+1
+#define SOCKET_SIZE 1024
+
+LRESULT CALLBACK WinBack(HWND hwnd, UINT msgID, WPARAM wparam, LPARAM lparap);
+
+struct AllSockets {
+    SOCKET sockets[SOCKET_SIZE];
+    int count;
+}; //存放所有SOCKET的结构体
+
+struct AllSockets all_sockets;
+int x = 0;
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
+{
+    WNDCLASSEX WS; //创建窗口结构体
+    WS.cbClsExtra = 0; //根据窗口类结构分配的额外字节数。系统将字节初始化为零。一般用不到，填0
+    WS.cbSize = sizeof(WNDCLASSEX); //窗口结构体大小
+    WS.cbWndExtra = 0; //窗口实例后要分配的额外字节数。系统将字节初始化为零.一般不用，填0。
+    WS.hbrBackground = NULL; //窗口颜色，默认为白
+    WS.hCursor = NULL; //设置光标形态
+    WS.hIcon = NULL; //左上角图标
+    WS.hIconSm = NULL; //最小化图标
+    WS.hInstance = hInstance; //实例句柄，填参数一 
+    WS.lpfnWndProc = WinBack; //填回调函数名字 
+    WS.lpszClassName = "SynSelect"; //当前窗口类的名字，随便起一个
+    WS.lpszMenuName =  NULL; //菜单
+    WS.style = CS_HREDRAW | CS_VREDRAW; //窗口风格
+    /*
+    CS_HREDRAW 水平刷新  CS_VREDRAW 垂直刷新
+    窗口改变时，需要重新绘制，不然窗口就无法正常显示
+    */
+
+   //注册窗口
+   RegisterClassEx(&WS);
+
+   //创建窗口
+   HWND hwnd = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW, "SynSelect", "SynSelect_Test", WS_OVERLAPPEDWINDOW, 200, 200, 600, 400, NULL, NULL, hInstance, NULL);
+	if (NULL == hwnd)
+	{
+		return 0;
+	}
+
+    //显示窗口
+    ShowWindow(hwnd, 1);
+
+    //重绘（刷新）窗口
+    UpdateWindow(hwnd);
+
+    WORD WSversion = MAKEWORD(2,2);  //版本号
+    WSADATA ServerSocket;
+    int return_WASA = WSAStartup(WSversion,&ServerSocket);
+    if(return_WASA!=0){
+        printf("初始化网络库失败!");
+        WSACleanup();  //清理网络库
+        return 0;
+    }
+    //启动网络库
+
+    SOCKET Socket_Server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    //创建服务端SOCKET Socket_Server
+    if(Socket_Server == INVALID_SOCKET){
+        //INVALID_SOCKET为socket函数返回失败值
+        printf("创建SOCKET失败!");
+        WSACleanup();
+        return 0;
+    }
+    //创建SOCKDET
+
+    all_sockets.count = 0;
+    all_sockets.sockets[all_sockets.count] = Socket_Server;
+    all_sockets.count++;
+    //将服务端SOCKET装入数组
+
+    struct sockaddr_in bind_info;
+    bind_info.sin_family = AF_INET;
+    bind_info.sin_port = htons(2333);
+    bind_info.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+    //配置协议端口与IP地址
+
+    int bind_return = bind(Socket_Server,(const struct sockaddr *)&bind_info,sizeof(bind_info));
+    if(bind_return == SOCKET_ERROR){
+        printf("绑定地址与端口失败!");
+        closesocket(Socket_Server);  //关闭SOCKET
+        WSACleanup();
+        return 0;
+    }
+
+    int listen_return = listen(Socket_Server,10);
+    //开始监听客户端连接
+    if(listen_return == SOCKET_ERROR){
+        printf("监听失败!");
+        closesocket(Socket_Server);
+        WSACleanup();
+        return 0;
+    } else {
+        printf("Listening...\n");
+    }
+
+    //给SOCEKT绑定消息，并投递给系统
+    if(WSAAsyncSelect(Socket_Server, hwnd, UM_ASYNSELECT, FD_ACCEPT) == SOCKET_ERROR){
+        closesocket(Socket_Server);
+        WSACleanup();
+        return 0;
+    }
+
+    //消息循环
+    MSG msg;
+    while(GetMessage(&msg, NULL, 0, 0)){
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    for(int n = 0; n<all_sockets.count; ++n){
+        closesocket(all_sockets.sockets[n]);
+        WSACleanup();
+    } //关闭全部SOCKET与清理网络库
+
+    return 0;
+}
+
+LRESULT CALLBACK WinBack(HWND hwnd, UINT msgID, WPARAM wparam, LPARAM lparam)
+{
+    SOCKET socket;
+    HDC hdc = GetDC(hwnd); //获取窗口显示区句柄
+
+    switch(msgID){
+        case WM_CREATE: //窗口 初始化产生，只产生一次，可以放用于初始化的代码
+            break;
+        case WM_DESTROY: //这里WM_XX就是消息
+            PostQuitMessage(0); //传递退出消息，没有的话窗口关闭不了
+            break;
+        case UM_ASYNSELECT:
+            socket = (SOCKET)wparam; //获取SOCKET
+            if(HIWORD(lparam) != 0){ //判断消息是否出错
+                if(WSAECONNABORTED == HIWORD(lparam)){ //客户端关闭
+                    WSAAsyncSelect(socket, hwnd, UM_ASYNSELECT, 0); //取消SOCKET上的消息
+                    closesocket(socket);
+                    for(int n =0; n<all_sockets.count; ++n){
+                        if(socket == all_sockets.sockets[n]){
+                            all_sockets.sockets[n] = all_sockets.sockets[all_sockets.count-1];
+                            all_sockets.count--;
+                            break;
+                        }
+                    }
+                    TextOut(hdc, 0, x, "Client Close", strlen("Client Close"));
+                    x+=15;
+                }
+                break;
+            }
+
+            //具体消息
+            switch(LOWORD(lparam)){
+                case FD_ACCEPT:
+                    TextOut(hdc, 0, x, "Client Connect", strlen("Client Connect")); //输出字符
+                    x+=15;
+                    SOCKET Socket_Client = accept(socket, NULL, NULL);
+                    if(Socket_Client == INVALID_SOCKET){
+                        break;
+                    }
+                    MessageBox(NULL, "Client Connect!", "Prompt", MB_OK); //弹出窗口
+                    //将客户端SOCKET绑定消息并投递给消息队列
+                    if(WSAAsyncSelect(Socket_Client, hwnd, UM_ASYNSELECT, FD_READ | FD_WRITE | FD_CLOSE) == SOCKET_ERROR){
+                        printf("ACCEPT ERROR! 错误代码: %d\n",WSAGetLastError());
+                        closesocket(Socket_Client);
+                        break;
+                    }
+                    all_sockets.sockets[all_sockets.count] = Socket_Client;
+                    all_sockets.count++;
+                    break;
+                case FD_READ:
+                {
+					char recv_msg[1024] = { 0 };
+					if (SOCKET_ERROR == recv(socket, recv_msg, 1023, 0))
+					{
+						break;
+					}
+					TextOut(hdc, 30, x, recv_msg, strlen(recv_msg));
+					x += 15;
+                }
+                    break;
+                case FD_WRITE:
+                    TextOut(hdc, 0, x, "write", strlen("write"));
+                    x+=15;
+                    break;
+                case FD_CLOSE:
+                    WSAAsyncSelect(socket, hwnd, UM_ASYNSELECT, 0); //取消SOCKET上的消息
+                    closesocket(socket);
+                    for(int n =0; n<all_sockets.count; ++n){
+                        if(socket == all_sockets.sockets[n]){
+                            all_sockets.sockets[n] = all_sockets.sockets[all_sockets.count-1];
+                            all_sockets.count--;
+                            break;
+                        }
+                    }
+                    TextOut(hdc, 0, x, "Client Close", strlen("Client Close"));
+                    x+=15;
+
+                    break;
+            }
+
+            break;
+    }
+
+    return DefWindowProc(hwnd, msgID, wparam, lparam); //对没有处理的消息默认处理
+}
+```
+
+
+
+**优化：** 每个窗口维护一定的SOCKET，当SOCKET过多时，延迟会增大，我们可以创建多个线程，每个线程管理一个窗口，每个窗口投递一定数量的客户端。当然线程不是万能的，也有最大处理效率。
+
+**问题：** 在一次处理过程中，客户端产生多次send，服务端会产生多次接收的消息，第一次接收消息会收完所有信息。
+
+
+
 ## 重叠IO模型
+
+
+
+### 介绍
+
+**意义：** 重叠IO是windows提供的一种异步读写文件的机制，SOCKET本质是文件操作，如`recv`，是阻塞的，等协议缓冲区的数据全部复制进buffer(缓冲区)里，函数才结束并返回复制的个数，写也一样，同一时间只能执行一个，也就是执行阻塞。
+
+**作用：** 系统多开线程，同时处理(异步)
+
+**实现：**将`accept、recv、send`优化为异步处理过程，用`AcceptEx、WSARecv、WSASend`函数代替它们，是对基本C/S模型的直接优化
+
+**本质：** 结构体(重叠结构) `WSAOVERLAPPED`，定义一个该结构体的变量与SOCKET绑定
+
+**使用：** 重叠IO模型把重叠结构与SOCKET绑定在一起并投递给系统，然后系统以重叠机制处理反馈
+
+重叠IO反馈的两种方式：**事件通知** - 调用AcceptEx等函数并投递被完成的操作，事件信号被置为有信号，调用WSAWaitForMultipleEvents获取事件信号、**完成历程** - 回调函数。可以单独或者配合使用。
+
+**性能：** 来源网络，普通电脑链接2w个SOCKET，同时请求send，CPU占用上涨40%(重叠IO模型)；完成端口CPU占用上涨2%左右
+
+
+
+### 事件通知
+
+**实现逻辑**
+
+1. 创建重叠IO模型使用的SOCKET 使用 `WSAScoekt`创建
+2. 投递-AcceptEx
+   - 立即完成，系统空闲且正好有链接
+     - 对客户端套接字投递 `WSARecv`
+       1. 立即完成-处理信息，对客户端套接字投递 `WSARecv`
+       2. 延迟完成-去循环等信号
+     - 根据需求对客户端套接字投递 `WSASend`
+       1. 立即完成-处理信息，根据需求投递 `WSASend`
+       2. 延迟完成-去循环等信号
+     - 对服务器套接字继续投递 `AcceptEx`,重复上述
+   - 延迟完成，系统开线程等待链接(异步)，去循环里等信号，有就分类处理
+3. 循环等信号
+   - 等信号- `WSAWaitForMultipleEvents`函数
+   - 有信号
+     - 获取重叠结构上的信息 `WSAGetOverlappedResult`函数
+     - 客户端退出，删除服务端的信息
+     - 接收链接 - 投递  `AcceptEx`
+     - 接收信息 - 处理消息，对客户端套接字投递 `WSARecv`
+     - 发送消息，根据需求投递 `WSASend`
+
+
+
+
+
+**WSASocket函数**
+
+创建用于异步操作的SOCKET
+
+`WSA`前缀的函数是windows专用的函数
+
+**函数原型**
+
+```c
+SOCKET WSAAPI WSASocket(
+  int                 af,
+  int                 type,
+  int                 protocol,
+  LPWSAPROTOCOL_INFOW lpProtocolInfo,
+  GROUP               g,
+  DWORD               dwFlags
+);
+```
+
+**参数介绍**
+
+与原 `socket`函数参数不同的参数：
+
+**参数四：** 定义了要创建的套接字的特性，不使用填 `NULL`，这里用不到
+
+**参数五：** 保留参数，暂时无用，填`0`
+
+**参数六：** 指定套接字属性，填 **`WSA_FLAG_OVERLAPPED`** - 创建一个支持重叠IO操作的套接字
+
+
+
+**返回值**
+
+成功，返回可用套接字，失败返回 `INVALID_SOCKET`
+
+
+
+**AcceptEx函数**
+
+**函数原型**
+
+```C
+BOOL AcceptEx(
+  SOCKET       sListenSocket,
+  SOCKET       sAcceptSocket,
+  PVOID        lpOutputBuffer,
+  DWORD        dwReceiveDataLength,
+  DWORD        dwLocalAddressLength,
+  DWORD        dwRemoteAddressLength,
+  LPDWORD      lpdwBytesReceived,
+  LPOVERLAPPED lpOverlapped
+);
+```
+
+**参数介绍**
+
+**参数一：** 服务器SOCKET
+
+**参数二：** 客户端SOCKET
+
+**参数三：** 指向缓冲区的指针，客户端发来的第一组数据由该参数(字符数组)接收，第二次以后由`recv`接收，不能设置为`NULL`
+
+**参数四：** 设置`0`，取消参数三的功能，一般用不到三，所以我们填0
+
+**参数五：** 为本地地址信息保留的字节数，该值必须比使用的传输协议的最大地址长度至少多16个字节，不能为0，**存储客户端IP与端口号**
+
+**参数六：** 为远程地址信息保留的字节数，该值必须比使用的传输协议的最大地址长度至少多16个字节。不能为零。与参数五填一样就行。
+
+**参数七：** 填NULL
+
+**参数八：** 重叠结构
+
+
+
+**返回值**
+
+立即完成返回 `TRUE`，出错返回 `FALSE`
+
+使用 `WSAGetLastError`函数得到错误代码，若为 `ERROR_IO_PENDING`表示延时处理需要单独处理，其他错误码为错误
+
+
+
+
+
+
+
+
 
 
 
