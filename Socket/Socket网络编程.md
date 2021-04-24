@@ -2302,8 +2302,6 @@ LRESULT CALLBACK WinBack(HWND hwnd, UINT msgID, WPARAM wparam, LPARAM lparam)
 
 
 
-
-
 **WSASocket函数**
 
 创建用于异步操作的SOCKET
@@ -2343,6 +2341,10 @@ SOCKET WSAAPI WSASocket(
 
 **AcceptEx函数**
 
+投递服务器SOCKET，让操作系统开一根线程监视，随时接收客户端链接
+
+
+
 **函数原型**
 
 ```C
@@ -2362,11 +2364,11 @@ BOOL AcceptEx(
 
 **参数一：** 服务器SOCKET
 
-**参数二：** 客户端SOCKET
+**参数二：** 自定义SOCKET，有客户端链接时，IP与端口号绑定在此
 
 **参数三：** 指向缓冲区的指针，客户端发来的第一组数据由该参数(字符数组)接收，第二次以后由`recv`接收，不能设置为`NULL`
 
-**参数四：** 设置`0`，取消参数三的功能，一般用不到三，所以我们填0
+**参数四：** 参数三数组大小，设置`0`，取消参数三的功能，一般用不到三，所以我们填0
 
 **参数五：** 为本地地址信息保留的字节数，该值必须比使用的传输协议的最大地址长度至少多16个字节，不能为0，**存储客户端IP与端口号**
 
@@ -2374,7 +2376,7 @@ BOOL AcceptEx(
 
 **参数七：** 填NULL
 
-**参数八：** 重叠结构
+**参数八：** 服务器SOCKET的重叠结构
 
 
 
@@ -2386,11 +2388,636 @@ BOOL AcceptEx(
 
 
 
+**WSARecv函数**
+
+投递异步接收信息
+
+**函数原型**
+
+```c
+int WSAAPI WSARecv(
+  SOCKET                             s,
+  LPWSABUF                           lpBuffers,
+  DWORD                              dwBufferCount,
+  LPDWORD                            lpNumberOfBytesRecvd,
+  LPDWORD                            lpFlags,
+  LPWSAOVERLAPPED                    lpOverlapped,
+  LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+);
+```
+
+**函数参数**
+
+**参数一：** 客户端SOCKET
+
+**参数二：** 接收后信息储存的缓冲区 `WSABUF`型结构体
+
+**WSABUF**：成员一为缓冲区的长度，以字节为单位，成员二为指向缓冲区的指针
+
+使用示例
+
+```c
+WSABUF wsabuf;
+char str[1024] = {0};
+wsabuf.buf = str;
+wsabuf.len = 1024;
+```
+
+**参数三：** 是`WSABUF`的个数
+
+**参数四：** 接收成功装成功接收到的字符数。参数六为NULL时，不能为NULL
+
+**参数五：** 指向用于修改**WSARecv**函数调用行为的标志的指针 ，填 **`MSG_PUSH_IMMEDIATE`**-该标志允许使用流套接字的应用程序告诉传输提供者不要延迟部分填充的未决接收请求的完成。处理小信息好。
+
+**参数六：** 对应SOCKET的重叠结构
+
+**参数七：** 回调函数，完成例程时使用，这里填 `NULL`
+
+
+
+**返回值**
+
+立即发生返回0， 错误返回`SOCKET_ERROR`，使用`WSAGetLastError`函数得到错误代码，若为 `ERROR_IO_PENDING`表示延时处理需要单独处理
+
+
+
+**WSAGetOverlappedResult函数**
+
+获取对应SOCKET上的具体情况：客户端链接、消息等
+
+**函数原型**
+
+```c
+BOOL WSAAPI WSAGetOverlappedResult(
+  SOCKET          s,
+  LPWSAOVERLAPPED lpOverlapped,
+  LPDWORD         lpcbTransfer,
+  BOOL            fWait,
+  LPDWORD         lpdwFlags
+);
+```
+
+**参数介绍**
+
+**参数一：** 有信号的SOCKET
+
+**参数二：** 对应的重叠结构
+
+**参数三：** 发送或者接收到的实际字节数，不能为`NULL`,参数为0表示客户端下线
+
+**参数四：** 选择事件通知模型填`TRUE`
+
+**参数五：** 装`WSARecv`的参数五，不能是`NULL`，如果重叠操作是通过`WSARecv`或 `WSARecvFrom`启动的 ，则此参数将包含`lpFlags`参数的结果值。此参数不能为`NULL`指针。
+
+
+
+**返回值**
+
+成功返回 `TRUE`， 错误返回 `FALSE`，获得错误码，如果为`10054`则为客户端强制退出
+
+
+
+**WSASend函数**
+
+**函数原型**
+
+```c
+int WSAAPI WSASend(
+  SOCKET                             s,
+  LPWSABUF                           lpBuffers,
+  DWORD                              dwBufferCount,
+  LPDWORD                            lpNumberOfBytesSent,
+  DWORD                              dwFlags,
+  LPWSAOVERLAPPED                    lpOverlapped,
+  LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+);
+```
+
+**参数介绍**
+
+**参数一：** 客户端SOCKET
+
+**参数二：** 接收信息储存的buffer
+
+**参数三：** WSABUF的个数
+
+**参数四：** 接收成功，装发送成功的字节数
+
+**参数五：** 函数调用行为标志
+
+**参数六：** 重叠结构
+
+**参数七：** 回调函数
+
+
+
+**返回值**
+
+立即发生：`0    失败` `SOCKET_ERROR` 获取错误代码若为 `ERROR_IO_PENDING`表示延时处理需要单独处理
 
 
 
 
 
+### 事件通知代码实现
+
+```c
+#include <stdio.h>
+#include <winsock2.h>
+#include <mswsock.h>
+
+#define MAXSIZE_SOCKET 1024
+#define MAXSIZE_BUF 1024
+
+SOCKET allsocket[MAXSIZE_SOCKET]; //创建SOCKET数组
+OVERLAPPED alloverlapp[MAXSIZE_SOCKET]; //创建重叠结构体数组
+int count;
+char str[MAXSIZE_BUF] = {0}; // 接收缓冲区
+
+int PostAccept();
+int PostRecv(int);
+int PostSend(int);
+void Clear(); //清理函数
+
+int main(void)
+{
+    WORD WSversion = MAKEWORD(2,2);  //版本号
+    WSADATA ServerSocket;
+    int return_WASA = WSAStartup(WSversion,&ServerSocket);
+    if(return_WASA!=0){
+        printf("初始化网络库失败!");
+        WSACleanup();  //清理网络库
+        return 0;
+    }
+    //启动网络库
+
+    SOCKET Socket_Server = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+    //创建服务端SOCKET Socket_Server
+    if(Socket_Server == INVALID_SOCKET){
+        //INVALID_SOCKET为socket函数返回失败值
+        printf("创建SOCKET失败!");
+        WSACleanup();
+        return 0;
+    }
+    //创建SOCKDET
+
+    struct sockaddr_in bind_info;
+    bind_info.sin_family = AF_INET;
+    bind_info.sin_port = htons(2333);
+    bind_info.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+    //配置协议端口与IP地址
+
+    int bind_return = bind(Socket_Server,(const struct sockaddr *)&bind_info,sizeof(bind_info));
+    if(bind_return == SOCKET_ERROR){
+        printf("绑定地址与端口失败!");
+        closesocket(Socket_Server);  //关闭SOCKET
+        WSACleanup();
+        return 0;
+    }
+
+    int listen_return = listen(Socket_Server,10);
+    //开始监听客户端连接
+    if(listen_return == SOCKET_ERROR){
+        printf("监听失败!");
+        closesocket(Socket_Server);
+        WSACleanup();
+        return 0;
+    } else {
+        printf("Listening...\n");
+    }
+
+    allsocket[count] = Socket_Server;
+    alloverlapp[count].hEvent = WSACreateEvent(); //给重叠结构的事件成员赋值一个合法的事件
+    count++;
+
+    if(PostAccept() != 0){
+        Clear();
+        return 0;
+    } //函数的调用逻辑比较复杂，我们封装成一个函数
+
+    while(1){ //循环等待事件
+        for(int n = 0;n < count;++n){
+            int wait_return = WSAWaitForMultipleEvents(1, &alloverlapp[n].hEvent, FALSE, 0, FALSE);
+            if(wait_return == WSA_WAIT_TIMEOUT || wait_return == WSA_WAIT_FAILED){ //超时或错误
+                continue;
+            }
+            DWORD dwstate;
+            DWORD dwflag;
+            BOOL get_return = WSAGetOverlappedResult(allsocket[n], &alloverlapp[n], &dwstate, TRUE, &dwflag);
+
+            WSAResetEvent(alloverlapp[n].hEvent); //信号制空
+
+            if(get_return == FALSE){
+                if(GetLastError() == 10054){
+                    printf("Client Close\n");
+                    closesocket(allsocket[n]);
+                    WSACloseEvent(alloverlapp[n].hEvent);
+                    allsocket[n] = allsocket[count-1];
+                    alloverlapp[n] = alloverlapp[count-1];
+                    n--; //循环控制变量减一
+                    count--; //个数减一
+                }
+                continue;
+            }
+            if(n == 0){ //接受链接完成
+                printf("Client Connect\n");
+                PostRecv(count);
+                count++;
+                PostAccept();
+                continue;
+            }
+            if(dwstate == 0){ //客户端下线
+                printf("Client Close\n");
+                closesocket(allsocket[n]);
+                WSACloseEvent(alloverlapp[n].hEvent);
+                allsocket[n] = allsocket[count-1];
+                alloverlapp[n] = alloverlapp[count-1];
+                n--; //循环控制变量减一
+                count--; //个数减一
+                continue;
+            }
+            if(dwstate != 0){ //发送或者接收成功
+                if(str[0] != 0){ //接收成功
+                    printf("Client: %s\n", str);
+                    memset(str, 0, MAXSIZE_BUF); //打印信息与清空缓冲区
+                    PostRecv(n); //递归，继续投递recv
+                } else { //发送成功
+                    printf("Send Success\n");
+                }
+            }
+        }
+    }
+
+    Clear();
+    return 0;
+}
+
+int PostAccept()
+{
+    allsocket[count] =  WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED); //使用socket函数也可以，但该函数更好
+    alloverlapp[count].hEvent = WSACreateEvent();
+    char str[1024] = {0};
+    BOOL Acp_return = AcceptEx(allsocket[0], allsocket[count], str, 0, sizeof(struct sockaddr_in)+16, sizeof(struct sockaddr_in)+16, NULL, &alloverlapp[0]); //基本地址长度为sizeof(struct sockaddr_in)
+    if(Acp_return == FALSE){ //错误处理
+    int error = WSAGetLastError();
+        if(error == ERROR_IO_PENDING){
+            return 0; //延时处理
+        } else {
+            return error; //出错
+        }
+    } else {
+        //立即完成
+        PostRecv(count); //投递recv
+        count++;
+        PostAccept(); //立即完成就递归
+    }
+
+    return 0;
+}
+
+int PostRecv(int index)
+{
+    WSABUF wsabuf;
+    wsabuf.buf = str;
+    wsabuf.len = MAXSIZE_BUF;
+    DWORD buffcount;
+    DWORD dwflag = 0;
+    int recv_return = WSARecv(allsocket[index], &wsabuf, 1, &buffcount, &dwflag, &alloverlapp[index], NULL);
+    if(recv_return == 0){
+        //立即完成
+        if(str[0] != 0){
+            printf("Client: %s", str);
+            memset(str, 0, MAXSIZE_BUF); //打印信息与清空缓冲区
+        }
+        PostRecv(index); //递归，继续投递recv
+        return 0;
+    } else {
+        int error = WSAGetLastError();
+        if(error == WSA_IO_PENDING){
+            return 0; //延迟处理
+        }
+        return error;
+    }
+
+}
+
+int PostSend(int index)
+{
+    WSABUF wsabuf;
+    wsabuf.buf = "Hello";
+    wsabuf.len = MAXSIZE_BUF;
+    DWORD dwSendCount;
+	DWORD dwFlag = 0;
+	int nRes = WSASend(allsocket[index], &wsabuf, 1, &dwSendCount, dwFlag, &alloverlapp[index], NULL);
+
+	if (0 == nRes)
+	{
+		//立即完成的
+		//打印信息
+		printf("send成功\n");
+		
+		return 0;
+	}
+	else
+	{
+		int a = WSAGetLastError();
+		if (ERROR_IO_PENDING == a)
+		{
+			//延迟处理
+			return 0;
+		}
+		else
+		{
+			return a;
+		}
+	}
+}
+
+void Clear()
+{
+    for(int n = 0;n < count; ++n){
+        closesocket(allsocket[n]);
+        WSACloseEvent(alloverlapp[n].hEvent);
+    }
+    WSACleanup();
+}
+```
+
+
+
+### 完成例程
+
+**本质：** 为我们的SOCKET，重叠结构绑定一个函数，当异步操作完成时，系统异步自动调用这个函数 ， `send`绑一个 `recv`绑一个，完成就调用各自的函数，然后我们在函数内做相应的操作。在分类方式上，完成例程性能更好，系统自动调用处理
+
+**逻辑：** 与事件通知基本相同，延时处理变成了回调函数处理
+
+**不同：** 在函数 `WSARecv WSASend` 最后一个参数上填上回调函数
+
+
+
+**回调函数介绍**
+
+**LPWSAOVERLAPPED_COMPLETION_ROUTINE回调函数**
+
+
+
+**函数原型**
+
+```c
+void CALLBACK LpwsaoverlappedCompletionRoutine(
+  DWORD dwError,
+  DWORD cbTransferred,
+  LPWSAOVERLAPPED lpOverlapped,
+  DWORD dwFlags
+);
+```
+
+**参数介绍**
+
+**参数一：** 错误码
+
+**参数二：** 发送或接收到的字节数
+
+**参数三：** 重叠结构
+
+**参数四：** 函数的执行方式
+
+与 `WSAGetOverlappedResult`函数对比，参数基本相同
+
+**处理流程**
+
+`dwError=10054`-强行退出，删除客户端
+
+`cbTransferred=0`，正常退出；不等于0，接收成功
+
+都不是，得到或发送完数据，继续投递接收请求
+
+
+
+**完成例程事件分类处理**
+
+由于所有的客户端的响应都在回调函数中做了，在 `WSAWaitForMultipleEvents`等待循环中就不用再处理了，只用处理服务器`SOCKET`对应事件就行了，`WSAWaitForMultipleEvents`函数参数五设置 `WSA_INFINITE`一直等待，参数六填 `TRUE`，将事件等待与完成例程机制结合在一起，实现等待事件函数与完成例程函数异步执行，完成例程函数执行完并给等待事件函数信号，事件函数返回  `WSA_WAIT_IO_COMPLETION`，被等待函数接收。此时返回值判断需要修改。
+
+
+
+### **完成例程代码实现**
+
+```c
+#include <stdio.h>
+#include <winsock2.h>
+#include <mswsock.h>
+
+#define MAXSIZE_SOCKET 1024
+#define MAXSIZE_BUF 1024
+
+SOCKET allsocket[MAXSIZE_SOCKET]; //创建SOCKET数组
+OVERLAPPED alloverlapp[MAXSIZE_SOCKET]; //创建重叠结构体数组
+int count;
+char str[MAXSIZE_BUF] = {0}; // 接收缓冲区
+
+int PostAccept();
+int PostRecv(int);
+int PostSend(int);
+void CALLBACK Recv_call(DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags);
+void CALLBACK Send_call(DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags);
+void Clear(); //清理函数
+
+int main(void)
+{
+    WORD WSversion = MAKEWORD(2,2);  //版本号
+    WSADATA ServerSocket;
+    int return_WASA = WSAStartup(WSversion,&ServerSocket);
+    if(return_WASA!=0){
+        printf("初始化网络库失败!");
+        WSACleanup();  //清理网络库
+        return 0;
+    }
+    //启动网络库
+
+    SOCKET Socket_Server = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+    //创建服务端SOCKET Socket_Server
+    if(Socket_Server == INVALID_SOCKET){
+        //INVALID_SOCKET为socket函数返回失败值
+        printf("创建SOCKET失败!");
+        WSACleanup();
+        return 0;
+    }
+    //创建SOCKDET
+
+    struct sockaddr_in bind_info;
+    bind_info.sin_family = AF_INET;
+    bind_info.sin_port = htons(2333);
+    bind_info.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+    //配置协议端口与IP地址
+
+    int bind_return = bind(Socket_Server,(const struct sockaddr *)&bind_info,sizeof(bind_info));
+    if(bind_return == SOCKET_ERROR){
+        printf("绑定地址与端口失败!");
+        closesocket(Socket_Server);  //关闭SOCKET
+        WSACleanup();
+        return 0;
+    }
+
+    int listen_return = listen(Socket_Server,10);
+    //开始监听客户端连接
+    if(listen_return == SOCKET_ERROR){
+        printf("监听失败!");
+        closesocket(Socket_Server);
+        WSACleanup();
+        return 0;
+    } else {
+        printf("Listening...\n");
+    }
+
+    allsocket[count] = Socket_Server;
+    alloverlapp[count].hEvent = WSACreateEvent(); //给重叠结构的事件成员赋值一个合法的事件
+    count++;
+
+    if(PostAccept() != 0){
+        Clear();
+        return 0;
+    } //函数的调用逻辑比较复杂，我们封装成一个函数
+
+    while(1){ //循环等待事件
+        int wait_return = WSAWaitForMultipleEvents(1, &(alloverlapp[0].hEvent), FALSE, WSA_INFINITE, TRUE);
+        if(wait_return == WSA_WAIT_IO_COMPLETION || wait_return == WSA_WAIT_FAILED){ //完成例程执行完或错误
+            continue;
+        }
+
+        WSAResetEvent(alloverlapp[0].hEvent); //信号制空
+        printf("Client Connect\n");
+        PostRecv(count);
+        count++;
+        PostAccept();
+    }
+
+    Clear();
+    return 0;
+}
+
+int PostAccept()
+{
+    allsocket[count] =  WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED); //使用socket函数也可以，但该函数更好
+    alloverlapp[count].hEvent = WSACreateEvent();
+    char str[1024] = {0};
+    BOOL Acp_return = AcceptEx(allsocket[0], allsocket[count], str, 0, sizeof(struct sockaddr_in)+16, sizeof(struct sockaddr_in)+16, NULL, &alloverlapp[0]); //基本地址长度为sizeof(struct sockaddr_in)
+    if(Acp_return == FALSE){ //错误处理
+    int error = WSAGetLastError();
+        if(error == ERROR_IO_PENDING){
+            return 0; //延时处理
+        } else {
+            return error; //出错
+        }
+    } else {
+        //立即完成
+        PostRecv(count); //投递recv
+        count++;
+        PostAccept(); //立即完成就递归
+    }
+
+    return 0;
+}
+
+int PostRecv(int index)
+{
+    WSABUF wsabuf;
+    wsabuf.buf = str;
+    wsabuf.len = MAXSIZE_BUF;
+    DWORD buffcount;
+    DWORD dwflag = 0;
+    int recv_return = WSARecv(allsocket[index], &wsabuf, 1, &buffcount, &dwflag, &alloverlapp[index], Recv_call);
+    if(recv_return == 0){
+        //立即完成
+        if(str[0] != 0){
+            printf("Client: %s", str);
+            memset(str, 0, MAXSIZE_BUF); //打印信息与清空缓冲区
+        }
+        PostRecv(index); //递归，继续投递recv
+        return 0;
+    } else {
+        int error = WSAGetLastError();
+        if(error == WSA_IO_PENDING){
+            return 0; //延迟处理
+        }
+        return error;
+    }
+
+}
+
+int PostSend(int index)
+{
+    WSABUF wsabuf;
+    wsabuf.buf = "Hello";
+    wsabuf.len = MAXSIZE_BUF;
+    DWORD dwSendCount;
+	DWORD dwFlag = 0;
+	int nRes = WSASend(allsocket[index], &wsabuf, 1, &dwSendCount, dwFlag, &alloverlapp[index], Send_call);
+
+	if (0 == nRes)
+	{
+		//立即完成的
+		//打印信息
+		printf("send成功\n");
+
+		return 0;
+	}
+	else
+	{
+		int a = WSAGetLastError();
+		if (ERROR_IO_PENDING == a)
+		{
+			//延迟处理
+			return 0;
+		}
+		else
+		{
+			return a;
+		}
+	}
+}
+
+void Clear()
+{
+    for(int n = 0;n < count; ++n){
+        closesocket(allsocket[n]);
+        WSACloseEvent(alloverlapp[n].hEvent);
+    }
+    WSACleanup();
+}
+
+void CALLBACK Recv_call(DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags)
+{
+    int index = lpOverlapped - &alloverlapp[0];
+    if(dwError == 10054 || cbTransferred == 0){ //客户端退出
+        printf("Client Close\n");
+        int index = lpOverlapped - &alloverlapp[0];
+        closesocket(allsocket[index]);
+        WSACloseEvent(alloverlapp[index].hEvent);
+        allsocket[index] = allsocket[count-1];
+        alloverlapp[index] = alloverlapp[count-1];
+        count--;
+    } else {
+        if(str[0] != 0){
+            printf("Client: %s\n", str);
+            memset(str, MAXSIZE_BUF, 0);
+        }
+        PostRecv(index);
+    }
+}
+
+void CALLBACK Send_call(DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags)
+{
+    printf("Send Success\n");
+}
+```
+
+
+
+**简单总结**
+
+事件通知是我们自己分配任务，顺序不能保证，循环次数多，下标越大客户端延迟越大
+
+完成例程是客户端根据具体事件自动调用代码，自动分类处理问题与异步选择相似
 
 
 
