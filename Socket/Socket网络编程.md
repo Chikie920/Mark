@@ -3023,7 +3023,144 @@ void CALLBACK Send_call(DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOv
 
 ## 完成端口模型
 
+完成端口也是windows的一种机制，在重叠IO模型上的优化
 
+**重叠IO问题**
+
+- 事件通知
+  1. 无序
+  2. 循环询问 - 延迟高
+  3. 采用多线程 - 数量多、管理难
+- 完成例程 - 线程数量多，每个客户端都有一个线程去调用对调函数，线程过多-切换线程消耗大量CPU资源
+- 完成端口
+  1. 模仿消息队列，创造一个通知队列，由系统创建，保证有序，不做无用功
+  2. 创建最佳数量的线程，充分利用CPU资源
+
+
+
+**线程数量分析**
+
+一般创建与CPU核数相同的线程数就可以了
+
+
+
+**完成端口代码逻辑**
+
+**原理：** 将重叠套接字与一个完成端口变量(一种类型的变量)绑定在一起，使用`AcceptEx、WSARecv、WSASend`投递请求。当系统异步完成请求，就会把通知存进一个队列，我们就叫它通知队列，该队列由操作系统创建与维护。完成端口可以理解为这个队列的头，通过 `GetQueuedCompletionStatus`从队列头往外拿，一个个处理。
+
+**代码**
+
+- 创建完成端口 `CreateIoCompletionPort` 
+- 将完成端口与SOCKET绑定 `CreateIoCompletionPort`
+- 创建指定数量的线程
+  - 与CPU核数一样 - `CreateThread`
+  - 线程内部
+    - `GetQueuedCompletionStatus`
+    - 分类处理
+- 使用`AcceptEx、WSARecv、WSASend`投递请求，主线程阻塞
+
+
+
+**创建完成端口 - CreateIoCompletionPort函数**
+
+在监听前创建并与服务器套接字绑定
+
+**功能**
+
+参数不同，功能不同
+
+- 创建完成端口
+- 将完成端口与套接字绑定
+
+
+
+**函数原型**
+
+```c
+HANDLE WINAPI CreateIoCompletionPort(
+  _In_     HANDLE    FileHandle,
+  _In_opt_ HANDLE    ExistingCompletionPort,
+  _In_     ULONG_PTR CompletionKey,
+  _In_     DWORD     NumberOfConcurrentThreads
+);
+```
+
+**参数介绍**
+
+**参数一** 
+
+1. 填 `INVALID_HANDLE_VALUE`宏，此时参数二必须为 `NULL`，参数三忽略-填`0`
+2. 服务器`SOCKET`
+
+**参数二** 
+
+1. `NULL`
+2. 完成端口变量
+
+**参数三** 
+
+1. 0
+2. 再次传递服务器套接字与系统接收到的数据关联在一起，也可以传下标
+
+**参数四** 
+
+1. 最多同时运行线程数量，等于CPU核数就行，填0自动获取CPU核数，也可以使用 `GetSysteminfo`获取
+2. 忽略，填0
+
+
+
+**返回值**
+
+**成功**
+
+1. 参二为NULL，返回一个新的完成端口
+2. 参二不为NULL，返回自己(端口变量)
+3. 参一为SOCKET，返回与SOCKET绑定的端口变量
+
+**失败**
+
+0，获取错误码，关闭句柄
+
+
+
+**创建线程 - CreateThread函数**
+
+创建一根线程
+
+**函数原型**
+
+```c
+HANDLE CreateThread(
+  LPSECURITY_ATTRIBUTES   lpThreadAttributes,
+  SIZE_T                  dwStackSize,
+  LPTHREAD_START_ROUTINE  lpStartAddress,
+  __drv_aliasesMem LPVOID lpParameter,
+  DWORD                   dwCreationFlags,
+  LPDWORD                 lpThreadId
+);
+```
+
+**参数介绍**
+
+**参数一：** 线程句柄是否能被继承 `NULL`-不被继承 指定线程的执行权限 `NULL`-默认
+
+**参数二：** 线程栈大小，以字节为单位 填0，系统使用默认大小 1M = 1024*1024byte
+
+**参数三：** 线程函数地址 `ThreadPort()`参数是参四传递进的数据
+
+**参数四：** 外部给线程传递数据
+
+**参数五：** `0` - 线程立即执行，填0就行；填`CREATE_SUSPENDED`线程挂起，等待状态；填 `STACK_SIZE_PARAM_IS_A_RESERVATION`指定堆栈的初始保留大小
+
+**参数六：** 线程ID，可以填`NULL`
+
+
+
+**返回值**
+
+成功 - 返回线程句柄，最后记得要释放
+
+失败 - `NULL`，得到错误码
 
 # 完结
 
