@@ -3115,7 +3115,7 @@ HANDLE WINAPI CreateIoCompletionPort(
 
 1. 参二为NULL，返回一个新的完成端口
 2. 参二不为NULL，返回自己(端口变量)
-3. 参一为SOCKET，返回与SOCKET绑定的端口变量
+3. 参一为SOCKET，返回与SOCKET绑定的端口变量，自己
 
 **失败**
 
@@ -3125,7 +3125,29 @@ HANDLE WINAPI CreateIoCompletionPort(
 
 **创建线程 - CreateThread函数**
 
-创建一根线程
+调用该函数只创建一根线程，所以我们需要获取CPU核数
+
+ **`GetSystemInfo()函数`**
+
+```c
+void GetSystemInfo(
+  LPSYSTEM_INFO lpSystemInfo
+);
+```
+
+**参数为指向 `SystemInfo`结构体的指针**
+
+该结构体只介绍一个成员 - `dwNumberOfProcessors`
+
+**使用**
+
+```c
+SYSTEM_INFO SystemInfo;
+GetSystemInfo(&SystemInfo);
+int nProcessorsCount = SystemInfo.dwNumberOfProcessors;
+```
+
+
 
 **函数原型**
 
@@ -3146,13 +3168,13 @@ HANDLE CreateThread(
 
 **参数二：** 线程栈大小，以字节为单位 填0，系统使用默认大小 1M = 1024*1024byte
 
-**参数三：** 线程函数地址 `ThreadPort()`参数是参四传递进的数据
+**参数三：** 线程函数地址 `ThreadPort()`的参数是参四传递进的数据，线程本质是执行线程函数内的代码
 
 **参数四：** 外部给线程传递数据
 
 **参数五：** `0` - 线程立即执行，填0就行；填`CREATE_SUSPENDED`线程挂起，等待状态；填 `STACK_SIZE_PARAM_IS_A_RESERVATION`指定堆栈的初始保留大小
 
-**参数六：** 线程ID，可以填`NULL`
+**参数六：** 线程ID，可以填`NULL`，我们可以通过返回值获取
 
 
 
@@ -3161,6 +3183,22 @@ HANDLE CreateThread(
 成功 - 返回线程句柄，最后记得要释放
 
 失败 - `NULL`，得到错误码
+
+
+
+**ThreadProc回调函数**
+
+```C
+DWORD WINAPI ThreadProc(
+  _In_ LPVOID lpParameter
+);
+```
+
+
+
+
+
+
 
 # 完结
 
