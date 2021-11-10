@@ -3,32 +3,34 @@
 
 using namespace std;
 
-const int N = 10;
-const int MAX_SIZE = 50;
-int a[MAX_SIZE] = {3, 5, 9, 2, 11, 23, 8, 45, 32, 43};
-
-int BinarySearch(int *a, int b)
+void BinarySearch(int x, int n, int *array)
 {
-    int l = 0, r = N-1;
-    while(l<r){
-        int i = (l+r)/2;
-        if(a[i]==b){
-            return i;
-        } else if(a[i]<b){
-            l = i+1;
+    int l=0, r=n-1;
+    while(l<=r){ //注意等号是必须的
+        int mid=(l+r)/2;
+        if(array[mid]==x){
+            cout<<mid;
+            return;
+        } else if(array[mid]>x){
+            r=mid-1;
         } else {
-            r = i;
+            l=mid+1;
         }
     }
-    return -1;
 }
+
 
 int main()
 {
-    int b;
-    cin>>b;
-    sort(a, a+N);
-    cout<<BinarySearch(a, b)<<endl;
-
+    const int MAX_SIZE = 50;
+    int array[MAX_SIZE] = {0};
+    int n;
+    int x;
+    cin>>n>>x;
+    for(int i=0; i<n; ++i){
+        cin>>array[i];
+    }
+    sort(array, array+n-1); //使用二分搜索需要对数组排序，使用STL sort函数即可
+    BinarySearch(x, n, array);
     return 0;
 }
