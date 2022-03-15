@@ -17,7 +17,7 @@ $$
 
 ### 标准化处理
 
-<img src="C:\Users\Mirai\AppData\Roaming\Typora\typora-user-images\image-20220116192604197.png" alt="image-20220116192604197" style="zoom:80%;" />
+<img src="https://github.com/Chikie920/Mark/tree/main/Sources/images_mathimage-20220116192604197.png" alt="image-20220116192604197" style="zoom:80%;" />
 
 
 
@@ -25,9 +25,9 @@ $$
 
 ### 计算得分
 
-<img src="C:\Users\Mirai\AppData\Roaming\Typora\typora-user-images\image-20220116192501669.png" alt="image-20220116192501669" style="zoom:80%;" />
+<img src="https://github.com/Chikie920/Mark/tree/main/Sources/images_mathimage-20220116192501669.png" alt="image-20220116192501669" style="zoom:80%;" />
 
-<img src="C:\Users\Mirai\AppData\Roaming\Typora\typora-user-images\image-20220116192906036.png" alt="image-20220116192906036" style="zoom:80%;" />
+<img src="https://github.com/Chikie920/Mark/tree/main/Sources/images_mathimage-20220116192906036.png" alt="image-20220116192906036" style="zoom:80%;" />
 
 
 
@@ -44,9 +44,9 @@ $$
 
 - 中间型转极大型
 
-![image-20220116193505241](C:\Users\Mirai\AppData\Roaming\Typora\typora-user-images\image-20220116193505241.png)
+![image-20220116193505241](https://github.com/Chikie920/Mark/tree/main/Sources/images_mathimage-20220116193505241.png)
 
 - 区间型转极大型
 
-![image-20220116193532411](C:\Users\Mirai\AppData\Roaming\Typora\typora-user-images\image-20220116193532411.png)
+![image-20220116193532411](https://github.com/Chikie920/Mark/tree/main/Sources/images_mathimage-20220116193532411.png)
 
