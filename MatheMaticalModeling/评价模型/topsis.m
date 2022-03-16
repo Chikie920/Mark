@@ -35,8 +35,8 @@ dis_p = sum( (repmat(max_line, n, 1) - data ).^2 , 2).^0.5
 dis_n = sum( (repmat(min_line, n, 1) - data ).^2 , 2).^0.5
 
 %step4 求出未归一化得分
-scores = dis_n./(dis_p+dis_n)
-
+scores = dis_n./(dis_p+dis_n);
+scores_std = scores./sum(scores)
 
 
 
