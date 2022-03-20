@@ -25,7 +25,7 @@ x(t_0) = x_0
 $$
 
 
-![image-20220119151307278](C:\Users\Mirai\AppData\Roaming\Typora\typora-user-images\image-20220119151307278.png)
+![image-20220119151307278](https://raw.githubusercontent.com/Chikie920/Mark/main/Sources/images_math/image-20220119151307278.png)
 
 **非线性最小二乘法求参数**
 

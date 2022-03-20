@@ -21,7 +21,7 @@ $$
 
 去量纲
 
-<img src="https://raw.githubusercontent.com/Chikie920/Mark/266f340e02a18857d4b3a9093f7577d9027fd0d3/Sources/images_math/image-20220116192604197.png" alt="image-20220116192604197" style="zoom:80%;" />
+<img src="https://raw.githubusercontent.com/Chikie920/Mark/main/Sources/images_math/image-20220116192604197.png" alt="image-20220116192604197" style="zoom:80%;" />
 
 
 
@@ -39,9 +39,9 @@ $$
 
 
 
-<img src="https://raw.githubusercontent.com/Chikie920/Mark/266f340e02a18857d4b3a9093f7577d9027fd0d3/Sources/images_math/image-20220116192501669.png" alt="image-20220116192501669" style="zoom:80%;" />
+<img src="https://raw.githubusercontent.com/Chikie920/Mark/main/Sources/images_math/image-20220116192501669.png" alt="image-20220116192501669" style="zoom:80%;" />
 
-<img src="https://raw.githubusercontent.com/Chikie920/Mark/266f340e02a18857d4b3a9093f7577d9027fd0d3/Sources/images_math/image-20220116192906036.png" alt="image-20220116192906036" style="zoom:80%;" />
+<img src="https://raw.githubusercontent.com/Chikie920/Mark/main/Sources/images_math/image-20220116192906036.png" alt="image-20220116192906036" style="zoom:80%;" />
 
 
 
@@ -58,9 +58,9 @@ $$
 
 - 中间型转极大型
 
-![image-20220116193505241](https://raw.githubusercontent.com/Chikie920/Mark/266f340e02a18857d4b3a9093f7577d9027fd0d3/Sources/images_math/image-20220116193505241.png)
+![image-20220116193505241](https://raw.githubusercontent.com/Chikie920/Mark/main/Sources/images_math/image-20220116193505241.png)
 
 - 区间型转极大型
 
-![image-20220116193532411](https://raw.githubusercontent.com/Chikie920/Mark/266f340e02a18857d4b3a9093f7577d9027fd0d3/Sources/images_math/image-20220116193532411.png)
+![image-20220116193532411](https://raw.githubusercontent.com/Chikie920/Mark/main/Sources/images_math/image-20220116193532411.png)
 
