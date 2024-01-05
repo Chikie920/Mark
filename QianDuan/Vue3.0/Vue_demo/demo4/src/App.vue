@@ -1,10 +1,12 @@
 <template>
-    <show></show>
+  <compute></compute>
 </template>
 
+
 <script setup>
-  import show from './components/show.vue';
+import compute from './components/compute.vue'
 </script>
+
 
 <style scoped>
 </style>

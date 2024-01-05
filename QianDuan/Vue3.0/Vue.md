@@ -191,4 +191,112 @@ npm run dev //运行
 
 
 
-vue2中`data`函数内的数据默认为响应式，而vue3的`setup`函数中则不是(为死数据)
+vue2中`data`函数内的数据默认为响应式，而vue3的`setup`函数中的数据则不是(数据可以改变但是页面显示不会改变)
+
+
+
+### ref函数
+
+`ref`函数既可以创建响应式的基本数据，又可以创建响应式对象
+
+**使用方式**
+
+```vue
+<script>
+    import { ref } from 'vue' // 必须引入
+
+    let number = ref(0) // 创建了一个响应式的数值型数据，初始值为0
+
+    /*
+    实际上就是讲number封装在一个Ref对象中
+    */
+    
+    number.value += 1 // 要想操作数据必须加上value，而template中无需加.value
+    
+    let person_ref = ref({name: 'chikie', age: 21}) // ref创建对象型响应式数据
+    
+    person_ref.value.age+=1 // 操作ref响应式对象数据
+    
+</script>
+```
+
+注意操作ref响应式数据时必须加**`.value`**，实际上ref创建对象型响应式数据底层还是由reactive实现的
+
+
+
+### reactive函数
+
+`reactive`函数仅支持创建响应式对象
+
+**使用方式**
+
+```vue
+<script>
+    import { reactive } from 'vue' // 必须引入
+    
+    let person_ref = reactive({name: 'chikie', age: 21}) // reactive创建对象型响应式数据
+    
+    person_ref.age+=1 // 操作reactive响应式对象数据
+    
+</script>
+```
+
+
+
+**见demo3**
+
+
+
+### ref与reactive创建响应式对象替换
+
+- `reactive`所创建响应式对象重新赋值一个新对象，会**失去**响应式（可以使用`Object.assign`去整体替换）
+
+```vue
+<script>
+let person = reactive({name:'chikie', age:19})
+
+person = {name:'john', age:21}// 页面不更新
+person = reactive({name:'john', age:21} )// 页面不更新
+Object.assign(perosn, {name:'john', age:21})// 正确做法
+</script>
+```
+
+- 而`ref`所创建响应式对象可以直接重新赋值一个新对象 
+
+```vue
+<script>
+let person = ref({name:'chikie', age:19})
+
+person.value = {name:'john', age:21} // 只要动了value必为响应式
+</script>
+```
+
+
+
+## template元素属性绑定
+
+`v-bind`将元素属性如class、id、value等与变量绑定，方式`v-bind:class`....
+
+但仅为单项绑定
+
+双向绑定使用`v-model`
+
+**示例见demo4**
+
+
+
+## 计算属性与方法
+
+计算属性对同一数据有缓存，多个同一数据只用计算一次，而方法则需计算多次
+
+计算属性借助`computed()`函数
+
+- computed函数返回数据为`ref`型对象
+- computed函数只传入一个参数时，该参数为get函数，此时返回数据只读
+- computed函数也可以接受一个带有 `get` 和 `set` 函数的**对象**来创建一个可写的 `ref` 对象
+
+**示例见demo5**
+
+
+
+## 事件监听
