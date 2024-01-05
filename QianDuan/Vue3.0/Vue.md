@@ -299,4 +299,4 @@ person.value = {name:'john', age:21} // 只要动了value必为响应式
 
 
 
-## 事件监听
+## props
