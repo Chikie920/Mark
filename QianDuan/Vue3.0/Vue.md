@@ -299,4 +299,64 @@ person.value = {name:'john', age:21} // 只要动了value必为响应式
 
 
 
-## props
+## 组件通信
+
+### mitt插件使用
+
+可以用于任意组件的通信，父-子，兄-弟...
+
+#### 安装
+
+```shell
+# 安装
+npm install --save mitt
+```
+
+#### 创建事件绑定与触发对象emitter
+
+```js
+// src内创建文件夹tools或者utils随意，创建emitter.js文件，文件名随意
+
+// emitter.js文件
+import mitt from 'mitt'
+// 引入mitt
+
+const emitter = mitt()
+// 创建emitter(名字随意)
+
+export default emitter
+// 暴露emitter
+```
+
+#### 使用
+
+**数据接收者(事件定义者)**
+
+```js
+// 要参与数据传递必须引入emitter
+import emitter from '@/tools/emitter.js'
+
+// 绑定事件
+emitter.on('事件名', handler) // handler为处理函数名
+
+function handler() { // 处理函数
+    //处理逻辑
+}//处理逻辑
+
+// 注意在页面撤销时需要解绑事件，回收内存
+emitter.off('事件名')
+```
+
+
+
+**数据发送者(事件触发者)**
+
+```js
+// 要参与数据传递必须引入emitter
+import emitter from '@/tools/emitter.js'
+
+function 触发处理函数() {
+    emitter.emit('事件名') // 触发了该函数
+}
+```
+

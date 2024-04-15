@@ -1898,7 +1898,7 @@ export const useTalkStore = defineStore('talk',()=>{
 概述：`props`是使用频率最高的一种通信方式，常用与 ：**父 ↔ 子**。
 
 - 若 **父传子**：属性值是**非函数**。
-- 若 **子传父**：属性值是**函数**。
+- 若 **子传父**：属性值是**函数**。父先给子传递函数，子用函数给父传递数据。
 
 父组件：
 
@@ -2282,7 +2282,7 @@ function sendToy(){
      // 注入数据
     let {money,updateMoney} = inject('moneyContext',{money:0,updateMoney:(x:number)=>{}})
      let car = inject('car')
-</script>
+   </script>
    ```
 
 
