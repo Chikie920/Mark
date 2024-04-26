@@ -1,5 +1,7 @@
 # Java入门到跑路
 
+阅读建议：本教程并不完善一些语法和细节没有包括，建议有编程基础（稍微学过一点Java基础），比如计算机专业的混子大学生。
+
 
 
 ## 草履虫基础
@@ -199,9 +201,9 @@ class Cat extends Animal {
 
 #### 多态运行特点
 
-调用成员变量时：编译看左边，运行看左边
+调用成员变量时：**编译看左边，运行看左边**
 
-调用成员方法时：编译看左边，运行看右边
+调用成员方法时：**编译看左边，运行看右边**
 
 ```java
 package com.chikie.basis;
@@ -215,7 +217,7 @@ public class DuoTai {
         System.out.println(cat.str);
         // 结果均为Animal
 
-        // dog.eat(); 不能调用特殊(特有)方法，编译不通过
+        // dog.eat(); 不能调用子类特殊(特有)方法，编译不通过
     }
 }
 
@@ -342,9 +344,295 @@ abstract class Apple implements Fruit {
 
 ### 内部类
 
+**内部类分为如下四种**
 
+```java
+package com.chikie.basis;
+
+public class ExternalClass {
+    public class InnerClassA {
+        // 成员内部类，作为ExternalClass的成员变量
+    }
+
+    static public class InnerClassB {
+        // 静态成员内部类，外部类可直接调用该类
+    }
+
+    public void methodA() {
+        class InnerClassC {
+            // 方法局部内部类，只在方法内部使用
+        }
+    }
+
+    public void methodB() {
+        InnerClassC innerClassC = new InnerClassC() {
+            @Override
+            public void method() {
+                // 实现方法
+            }
+        }; // 匿名内部类，只使用一次
+    }
+}
+
+interface InnerClassC {
+    void method();
+}
+
+```
+
+
+
+### 枚举
+
+枚举本质为类
 
 
 
 ### lambda表达式
+
+本质是避免为了实现接口或者抽象类而再声明一个类再来创建该类的对象
+
+
+
+#### 语法
+
+
+
+**语法注意点**
+
+1. **参数类型可以省略**
+2. **假如只有一个参数，()括号可以省略**
+3. **如果方法体只有一条语句，{}大括号可以省略**
+4. **如果方法体中唯一的语句是return返回语句，那省略大括号的同时return也要省略**
+
+```java
+package com.chikie.basis;
+
+public class LambdaTest {
+    public static void main(String[] args) {
+        ClassOne classOne = new ClassOne() {
+            @Override
+            public void method() {
+                System.out.println("Hello Lambda");
+            }
+        }; // 完整写法
+
+        ClassOne classOne1 = ()->{
+            System.out.println("Hello Lambda");
+        }; // 精简写法
+
+        ClassOne classOne2 = ()->System.out.println("Hello Lambda"); // 更精简写法，方法体内只有一条语句时可以去掉大括号
+        /****测试****/
+        classOne1.method();
+        classOne1.method();
+        classOne2.method();
+
+        ClassTwo classTwo = (a)->{return a;}; // 有返回值写法
+        ClassTwo classTwo1 = (a)->a; // 有返回值写法，精简版
+        ClassTwo classTwo2 = a->a; // 一个参数时，小括号也可以去掉
+        /****测试****/
+        System.out.println(classTwo.method(1));
+        System.out.println(classTwo1.method(1));
+        // 结果 1 1 1
+
+        ClassThree classThree = (a, b)->a+b;
+        /****测试****/
+        System.out.println(classThree.method(1, 2));
+        // 结果为3
+
+    }
+}
+
+interface ClassOne {
+    void method();
+}
+
+interface ClassTwo {
+    int method(int a);
+}
+
+interface ClassThree {
+    int method(int a, int b);
+}
+```
+
+
+
+#### 方法引用
+
+**原理：利用已有函数实现lambda表达式中的接口或者抽象类的方法**
+
+```java
+package com.chikie.basis;
+
+public class MehodRefer {
+    public int add_method(int a, int b) {
+        return a+b;
+    }
+
+    public static int add_method_2(int a, int b) {
+        return a+b;
+    }
+
+    public static void main(String[] args) {
+        /****方法引用****/
+        MehodRefer mehodRefer = new MehodRefer();
+        Cal cal = mehodRefer::add_method; // 引用对象方法
+        System.out.println(cal.add(1, 3));
+        // 结果为4
+
+        Cal cal1 = MehodRefer::add_method_2;
+        System.out.println(cal1.add(1, 2)); // 引用类方法
+        // 结果为3
+
+        ClassFour classFour = System.out::println;
+        /*
+        这里，ClassFour接口的method方法没有返回值，接收String类型参数
+        而System.out的println方法也是如此，可以引用
+         */
+        classFour.method("Hello Lambda");
+        // 输出内容
+
+        /****构造方法引用****/
+        Student student = Human::new; // 有参构造方法
+        student.method("chikie", 21);
+        // 输出有参构造
+
+        Worker worker = Human::new; // 无参构造方法
+        worker.method();
+        // 输出无参构造
+    }
+}
+
+interface Cal {
+    int add(int a, int b);
+}
+
+interface ClassFour {
+    void method(String str);
+}
+
+class Human {
+    public String name;
+    public int age;
+
+    public Human() {
+        System.out.println("无参构造");
+    }
+
+    public Human(String name, int age) {
+        this.name = name;
+        this.age = age;
+        System.out.println("有参构造");
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Kid{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+
+interface Student {
+    void method(String name, int age);
+}
+
+interface Worker {
+    void method();
+}
+
+```
+
+
+
+### IO
+
+![image-20240426204641046](D:\Work\Mark\Java Basis\assets\image-20240426204641046.png)
+
+
+
+#### **补充知识点：**
+
+**class.getResource()方法**
+
+```java
+// getResource("")不带"/“时候是从当前类所在包路径去获取资源
+// getResource("/")带”/"时候是从classpath的根路径获取
+```
+
+
+
+#### 字节流
+
+**FileInputStream与FileOutputStream**
+
+```java
+package com.chikie.basis;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+
+public class IOTest {
+    public static void main(String[] args) {
+        System.out.println(IOTest.class.getResource(""));
+        System.out.println(IOTest.class.getResource("/"));
+
+        File file = new File(IOTest.class.getResource("/").getPath() + "content.txt");
+
+        // 字节流
+        try {
+            FileInputStream fileInputStream = new FileInputStream(file); // 获取输出流
+            long length = file.length(); // 获取文件字节数
+            int res; // 存储字符
+            for (int i = 0; i < length; ++i) { // 按字节数循环读取
+                res = fileInputStream.read(); // 每次读取一个字符
+                System.out.print((char) res);
+            } // 根据结果可以看出按字节读取中文字符会乱码，因为中文字符不只占一字节
+            System.out.println("\n");
+            fileInputStream.close(); // 关闭流
+
+            /********/
+
+            fileInputStream = new FileInputStream(file); // 重新打开文件
+            byte[] bytes = new byte[2]; // 两字节存储
+            while (fileInputStream.read(bytes)!=-1) {
+                System.out.println(new String(bytes)); // String接收字节数组创建字符串
+            }
+
+            fileInputStream.close();
+
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+}
+
+```
+
+**结果**
+
+![image-20240426215626601](D:\Work\Mark\Java Basis\assets\image-20240426215626601.png)
 
