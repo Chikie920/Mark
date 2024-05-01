@@ -636,3 +636,72 @@ public class IOTest {
 
 ![image-20240426215626601](D:\Work\Mark\Java Basis\assets\image-20240426215626601.png)
 
+
+
+#### 字符流
+
+以字符为单位进行读取
+
+**FileReader**
+
+```java
+package com.chikie.basis;
+
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+
+public class IOTest2 {
+    public static void main(String[] args) {
+        try {
+            FileReader fileReader = new FileReader(IOTest2.class.getResource("/").getPath()+"content.txt");
+            int res;
+            while((res = fileReader.read())!=-1) {
+                System.out.print((char)res);
+            }
+
+            fileReader.close();
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+```
+
+![image-20240501172450550](D:\Work\Mark\Java Basis\assets\image-20240501172450550.png)
+
+**FileWriter**
+
+```java
+package com.chikie.basis;
+
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+
+public class IOTest2 {
+    public static void main(String[] args) {
+        try {
+            FileWriter fileWriter = new FileWriter(IOTest2.class.getResource("/").getPath() + "content.txt", true); // 第二个参数表示文件追加
+            fileWriter.write("\nJvav之父是张浩扬");
+            fileWriter.close(); // 刷新流然后关闭
+            FileReader fileReader = new FileReader(IOTest2.class.getResource("/").getPath()+"content.txt");
+            int res;
+            while ((res = fileReader.read()) != -1) {
+                System.out.print((char) res);
+            }
+            fileReader.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+```
+
+![image-20240501172629291](D:\Work\Mark\Java Basis\assets\image-20240501172629291.png)
+
+
+
