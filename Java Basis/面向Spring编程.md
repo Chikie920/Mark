@@ -188,5 +188,456 @@ Dog{name='null', age=0}`
 
 
 
-#### 如何设置bean的属性(成员变量)?
 
+
+## 依赖注入DI
+
+简而言之就是给bean的成员变量(属性)赋值
+
+
+
+### set方法注入
+
+类需要提供相应属性的set方法，否则无法注入
+
+
+
+#### 值注入
+
+
+
+**Dog类跟上面的第一个例子一样，无改动**
+
+```java
+package com.chikie.Entity;
+
+public class Dog {
+    private String name;
+    private int age;
+
+    public Dog() {
+        System.out.println("无参构造被调用");
+    }
+
+    public Dog(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Dog{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+
+```
+
+
+
+**SpringConfig.xml**
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+    <bean id="dog1" name="myDog" class="com.chikie.Entity.Dog">
+        <property name="name" value="布鲁斯"></property>
+        <property name="age" value="1" />
+        <!--两种写法均可-->
+    </bean>
+</beans>
+```
+
+使用`property`标签，`name`参数与要注入属性的**set方法相关**（如下会有解释），`value`表示要注入的值
+
+
+
+**Test类**
+
+```java
+package com.chikie.Entity;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class SpringTest {
+    @Test
+    public void firstDemoTest() {
+        ApplicationContext applicationContext = new ClassPathXmlApplicationContext("SpringConfig.xml"); // 读取Spring配置文件，创建Spring容器
+        Object dog1 = applicationContext.getBean("dog1"); // 根据id从容器中获取bean
+        System.out.println((Dog) dog1);
+    }
+}
+```
+
+**结果：**
+
+`无参构造被调用
+Dog{name='布鲁斯', age=1}`
+
+
+
+##### 值注入与类中set方法的联系
+
+我们修改Dog类如下
+
+```java
+package com.chikie.Entity;
+
+public class Dog {
+    private String name;
+    private int age;
+
+    public Dog() {
+        System.out.println("无参构造被调用");
+    }
+
+    public Dog(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setAaa(String name) {
+        this.name = name;
+    } // 设置name的set方法名称改动
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Dog{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+
+```
+
+
+
+**SpringConfig.xml**
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+    <bean id="dog1" name="myDog" class="com.chikie.Entity.Dog">
+        <property name="aaa" value="布鲁斯"></property>
+        <!--name参数的值改为了aaa，对应于setAaa-->
+        <property name="age" value="1" />
+    </bean>
+</beans>
+```
+
+
+
+**运行测试类，结果如下**
+
+`无参构造被调用
+Dog{name='布鲁斯', age=1}`
+
+可见类的name属性被正常赋值了
+
+
+
+**结论：**`property`参数的`name`属性值与类中要注入属性的**set方法的名称**对应，与注入属性名称无关
+
+上例中，类中要注入属性的名称为name，set方法名称为setAaa，`property`参数的name属性值为aaa
+
+**可见set方法名称setXyz其对应`property`参数的name属性值为xyz**，**xyz为任意字符**
+
+即
+
+- setName对应name
+- setAge对应age
+
+
+
+#### 引用注入
+
+值注入为基本数据类型的数据注入，而引用注入则是对于对象的注入
+
+
+
+新建类`Student`如下
+
+```java
+package com.chikie.Entity;
+
+public class Student {
+    private String name;
+    private int age;
+    private Dog dog; // 有一个类成员变量(类属性)
+
+    public Student() {
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public Dog getDog() {
+        return dog;
+    }
+
+    public void setDog(Dog dog) {
+        this.dog = dog;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                ", dog=" + dog +
+                '}';
+    }
+}
+
+```
+
+
+
+**SpringConfig.xml**
+
+```java
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+    <bean id="dog1" name="myDog" class="com.chikie.Entity.Dog">
+        <property name="name" value="布鲁斯"></property>
+        <property name="age" value="1" />
+    </bean>
+
+    <bean id="student" name="student" class="com.chikie.Entity.Student">
+        <property name="name" value="chikie"></property>
+        <property name="age" value="21"></property>
+        <!--值注入-->
+        <property name="dog" ref="dog1"></property>
+        <!--引用注入，使用已经被Spring管理的bean进行注入-->
+     </bean>
+</beans>
+```
+
+
+
+**测试类**
+
+```java
+package com.chikie.Entity;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class SpringTest {
+    @Test
+    public void firstDemoTest() {
+        ApplicationContext applicationContext = new ClassPathXmlApplicationContext("SpringConfig.xml"); // 读取Spring配置文件，创建Spring容器
+        Object dog1 = applicationContext.getBean("dog1"); // 根据id从容器中获取bean
+        System.out.println((Dog) dog1);
+
+        Student student = applicationContext.getBean("student", Student.class); // 这种方法获取bean就不用强制转型了
+        System.out.println(student);
+    }
+}
+
+```
+
+**结果：**
+
+`无参构造被调用
+Dog{name='布鲁斯', age=1}
+Student{name='chikie', age=21, dog=Dog{name='布鲁斯', age=1}}`
+
+
+
+**引用注入即将`value`属性换为了`ref`属性**
+
+
+
+### 构造方法注入
+
+使用构造方法给类的属性赋值
+
+
+
+为Student类加上有参构造方法
+
+```java
+package com.chikie.Entity;
+
+public class Student {
+    private String name;
+    private int age;
+    private Dog dog;
+
+    public Student() {
+    }
+
+    public Student(String name, int age, Dog dog) {
+        this.name = name;
+        this.age = age;
+        this.dog = dog;
+    } // 新增代码
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public Dog getDog() {
+        return dog;
+    }
+
+    public void setDog(Dog dog) {
+        this.dog = dog;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                ", dog=" + dog +
+                '}';
+    }
+}
+
+```
+
+
+
+**SpringConfig.xml**
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+    <bean id="dog1" name="myDog" class="com.chikie.Entity.Dog">
+        <property name="name" value="布鲁斯"></property>
+        <property name="age" value="1" />
+    </bean>
+
+    <bean id="student" name="student" class="com.chikie.Entity.Student">
+        <constructor-arg name="name" value="chikie"></constructor-arg>
+        <constructor-arg name="age" value="21"></constructor-arg>
+        <constructor-arg name="dog" ref="dog1"></constructor-arg>
+        <!--使用构造方法注入-->
+     </bean>
+</beans>
+```
+
+**测试类代码同上**
+
+**结果为**
+
+`无参构造被调用
+Dog{name='布鲁斯', age=1}
+Student{name='chikie', age=21, dog=Dog{name='布鲁斯', age=1}}`
+
+
+
+**总结：**使用构造方法注入参数，使用`constructor-arg`标签，通过设置`name`属性（还可以使用index等，不过都没有name属性直观）、`value`属性-值注入、以及`ref`属性
+
+
+
+### 自动装配
+
+即Spring自动进行属性的注入（**引用注入**）
+
+更改**SpringConfig.xml**代码如下，其他代码均相同
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+    <bean id="dog1" name="myDog" class="com.chikie.Entity.Dog">
+        <property name="name" value="布鲁斯"></property>
+        <property name="age" value="1" />
+    </bean>
+
+    <bean id="student" name="student" class="com.chikie.Entity.Student" autowire="byType">
+        <property name="name" value="chikie"></property>
+        <property name="age" value="21"></property>
+        <!--没有显式编写dog参数的注入-->
+     </bean>
+</beans>
+```
+
+通过在需要自动装配的bean标签中加入`autowire`参数，并设置`byType`或`byName`来实现自动注入
+
+推荐使用`byType`根据所需要的类别进行自动装配，而`byName`的名称规则与bean标签`name`属性的值规则相同，比如要注入的属性的set方法为setDog，那么要自动装配的bean的id或name其中之一需要为dog，否则自动装配后的值为null
+
+
+
+#### 探究
+
+**当使用`byType`进行自动装配时，如果有两个级以上的满足要求的类别时，结果会怎样？**
+
+![image-20240503144731212](D:\Work\Mark\Java Basis\assets\image-20240503144731212.png)
+
+**结论为无法注入**
+
+
+
+### 引用配置文件
