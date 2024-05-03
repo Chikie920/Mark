@@ -504,7 +504,7 @@ Student{name='chikie', age=21, dog=Dog{name='布鲁斯', age=1}}`
 
 ### 构造方法注入
 
-使用构造方法给类的属性赋值
+使用构造方法给类的属性赋值，使用该种方法，对象实例化与赋值是**同时**进行的，不像set注入，对象先被实例化再进行赋值
 
 
 
@@ -641,3 +641,146 @@ Student{name='chikie', age=21, dog=Dog{name='布鲁斯', age=1}}`
 
 
 ### 引用配置文件
+
+首先要了解Spring XML配置文件中的**命名空间**的概念 [链接](https://zhuanlan.zhihu.com/p/194263065)
+
+简要概括一下，命名空间是来自XML文件的概念，主要是用来引入标签的。
+
+
+
+要引入配置文件需要修改XML如下
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+
+</beans>
+```
+
+
+
+**新建DataSource类**
+
+```java
+package com.chikie.Entity;
+
+public class DataSource {
+    private String url;
+    private String userName;
+    private String password;
+
+    public DataSource() {
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    @Override
+    public String toString() {
+        return "DataSource{" +
+                "url='" + url + '\'' +
+                ", userName='" + userName + '\'' +
+                ", password='" + password + '\'' +
+                '}';
+    }
+}
+
+```
+
+
+
+**jdbc.properties文件**
+
+在resource目录下
+
+```properties
+url=jdbc:mysql://localhost:3306/test
+username=root
+password=123456
+```
+
+
+
+修改后的配置文件如下
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                            http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+    <context:property-placeholder location="jdbc.properties"></context:property-placeholder>
+
+    <bean name="dataSource" class="com.chikie.Entity.DataSource">
+        <property name="url" value="${url}"></property>
+        <property name="userName" value="${username}"></property>
+        <property name="password" value="${password}"></property>
+    </bean>
+</beans>
+```
+
+
+
+测试类如下
+
+```java
+package com.chikie.Entity;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class SpringTest {
+    @Test
+    public void firstDemoTest() {
+        ApplicationContext applicationContext = new ClassPathXmlApplicationContext("SpringConfig.xml"); // 读取Spring配置文件，创建Spring容器
+        DataSource dataSource = applicationContext.getBean("dataSource", DataSource.class);
+        System.out.println(dataSource);
+    }
+}
+
+```
+
+运行结果为：
+
+`DataSource{url='jdbc:mysql://localhost:3306/test', userName='Mirai', password='123456'}`
+
+但是仔细一看，发现userName的值并不是root，而是本机的用户名，是因为**spring默认会优先加载系统环境变量，此时获取到的username的值实际上指的是当前计算机的用户名。而不是properties配置文件中指定的username的值。**
+
+这里我们修改名称即可，注意${}内大小写不敏感，修改为user_name即可
+
+
+
+#### **结论**
+
+**引入配置文件的步骤：**
+
+1. **xml配置文件中加入context命名空间**
+2. **<context:property-placeholder location="配置文件名"></context:property-placeholder>**
+3. **在bean的`value`属性中(冒号内)使用`${参数名}`来引用配置文件中的参数**

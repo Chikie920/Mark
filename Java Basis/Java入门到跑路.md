@@ -710,6 +710,116 @@ public class IOTest2 {
 
 ### 反射
 
+- **java文件：就是我们自己编写的java代码。**
+
+- **字节码文件：就是通过java文件编译之后的class文件（是在硬盘上真实存在的，用眼睛能看到的）**
+
+- **字节码文件对象：当class文件加载到内存之后，虚拟机自动创建出来的对象。这个对象里面至少包含了：构造方法，成员变量，成员方法。**
+
+
+
+#### 获取字节码文件对象
+
+**反射第一步首先是获取字节码文件对象**
+
+在`com.chikie.Entity`包下新建类`Student`
+
+```java
+package com.chikie.Entity;
+
+public class Student {
+    public String name;
+    private int age;
+    private String gender;
+
+    public Student() {
+    }
+
+    public Student(String name, int age, String gender) {
+        this.name = name;
+        this.age = age;
+        this.gender = gender;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
+    private void privateMethod() {
+        System.out.println("private method");
+    }
+}
+
+```
+
+
+
+**测试类**
+
+```java
+package com.chikie.basis;
+
+import com.chikie.Entity.Student;
+
+public class InflectTest {
+    public static void main(String[] args) {
+        try {
+            Class aClass = Class.forName("com.chikie.Entity.Student");
+            // 方法一 使用Class.forName传入全类名获取
+            System.out.println(aClass);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+        Class bClass = Student.class;
+        // 方法二 使用类名.class获取
+        System.out.println(bClass);
+
+        Student student = new Student();
+        Class cClass = student.getClass();
+        // 方法三 创建对象获取
+        System.out.println(cClass);
+
+    }
+}
+
+```
+
+**结果：**
+
+`class com.chikie.Entity.Student
+class com.chikie.Entity.Student
+class com.chikie.Entity.Student`
+
+
+
+**这里推荐第二种方法获取**
+
+
+
+#### 获取类属性
+
+| 方法名                              | 说明                                         |
+| ----------------------------------- | -------------------------------------------- |
+| Field[] getFields()                 | 返回所有成员变量对象的数组（只能拿public的） |
+| Field[] getDeclaredFields()         | 返回所有成员变量对象的数组，存在就能拿到     |
+| Field getField(String name)         | 返回单个成员变量对象（只能拿public的）       |
+| Field getDeclaredField(String name) | 返回单个成员变量对象，存在就能拿到           |
+
+
+
 
 
 
