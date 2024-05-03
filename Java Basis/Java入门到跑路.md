@@ -1,6 +1,6 @@
 # Java入门到跑路
 
-阅读建议：本教程并不完善一些语法和细节没有包括，建议有编程基础（稍微学过一点Java基础），比如计算机专业的混子大学生。
+阅读建议：本教程并不完善一些语法与细节没有包括（个人认为网上其它资源已经足够全面，请自行学习），建议有编程基础（稍微学过一点Java基础），比如计算机专业的混子大学生。
 
 
 
@@ -64,9 +64,9 @@ while (!inputStr.equals("-1")) {
 }
 ```
 
-**next()方法读取一个有效字符串，其前的空白字符会被处理，读取到空白字符为止(并不处理)**
+**next()方法读取一个有效字符串，其前的空白字符会被处理，读取到空白字符为止(并不丢弃)**
 
-**nextLine()方法读取一行字符串，遇到换行符结束，不保存末尾换行符**
+**nextLine()方法读取一行字符串，遇到换行符结束，不保存末尾换行符(并不丢弃)**
 
 ![image-20240423190436338](D:\Work\Mark\Java Basis\assets\image-20240423190436338.png)
 
@@ -84,7 +84,7 @@ while (!inputStr.equals("-1")) {
 public static void main(String[] args) {
     int[] a; // 数组声明 表明变量的存在
     a = new int[5]; // 数组定义 为变量开辟存储空间
-    System.out.println(a[4]); // 输出0
+    System.out.println(a[4]); // 输出0，默认初始化值为0
 }
 ```
 
@@ -217,6 +217,7 @@ public class DuoTai {
         System.out.println(cat.str);
         // 结果均为Animal
 
+        // *******************************************
         // dog.eat(); 不能调用子类特殊(特有)方法，编译不通过
     }
 }
@@ -351,7 +352,7 @@ package com.chikie.basis;
 
 public class ExternalClass {
     public class InnerClassA {
-        // 成员内部类，作为ExternalClass的成员变量
+        // 成员内部类，作为ExternalClass的成员变量 通过 new ExternalClass(). new InnerClassA()创建
     }
 
     static public class InnerClassB {
@@ -702,6 +703,28 @@ public class IOTest2 {
 ```
 
 ![image-20240501172629291](D:\Work\Mark\Java Basis\assets\image-20240501172629291.png)
+
+
+
+
+
+### 反射
+
+
+
+
+
+### 注解
+
+
+
+
+
+## 番外
+
+
+
+### Maven
 
 
 
