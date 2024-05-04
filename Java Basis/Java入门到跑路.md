@@ -820,7 +820,184 @@ class com.chikie.Entity.Student`
 
 
 
+获得Field对象后
 
+| 方法                                | 说明               |
+| ----------------------------------- | ------------------ |
+| void set(Object obj, Object value） | 给对象对应属性赋值 |
+| Object get(Object obj)              | 获取对象对应属性值 |
+
+
+
+```java
+package com.chikie.basis;
+
+import com.chikie.Entity.Student;
+
+import java.lang.reflect.Field;
+
+public class InflectFieldTest {
+    public static void main(String[] args) throws NoSuchFieldException, IllegalAccessException {
+        Student student = new Student("chikie", 21, "male");
+
+        Class studentClass = Student.class;
+
+
+        Field[] fields = studentClass.getFields(); // 获取类的所有公共属性
+        System.out.println(fields.length); // Student类中只有一个public属性，故长度为1
+        Field name_field = fields[0]; // 获取这唯一的属性
+        System.out.println(name_field.getName()); // 获取属性名称
+        System.out.println("***********************");
+        System.out.println(name_field.get(student)); // 获取对象对应属性值
+        name_field.set(student, "john"); // 设置对象对应属性值
+        System.out.println(name_field.get(student)); // 修改后结果
+        System.out.println("***********************");
+
+        Field[] declaredFields = studentClass.getDeclaredFields(); // 获取类的所有属性
+        System.out.println(declaredFields.length); // 获取Student类的所有属性 有3个
+        for(Field field : declaredFields) {
+            System.out.println(field.getName());
+        }
+        System.out.println("***********************");
+        Field age_declaredField = declaredFields[1]; // 获取age属性
+        age_declaredField.setAccessible(true); // 修改属性的访问权限，如果属性是私有的，则无法直接访问
+        System.out.println(age_declaredField.get(student)); // 获取student对象的age属性值
+        age_declaredField.set(student, 22);
+        System.out.println(age_declaredField.get(student)); // 修改后结果
+
+        Field name_field_b = studentClass.getField("name"); // 根据属性名称获取，只能获取public修饰的属性
+        Field age_field = studentClass.getDeclaredField("age"); // 根据属性名称获取，所有属性均可获取
+
+
+    }
+}
+
+```
+
+**结果：**
+
+![image-20240504131649716](D:\Work\Mark\Java Basis\assets\image-20240504131649716.png)
+
+
+
+##### 注意
+
+对于`private`修饰的属性，要获取对象的相应属性或者设置相应值需要修改属性的访问权限，使用`setAccessible`方法
+
+
+
+#### 获取类方法
+
+| 方法名                                                       | 说明                                         |
+| ------------------------------------------------------------ | -------------------------------------------- |
+| Method[] getMethods()                                        | 返回所有成员方法对象的数组（只能拿public的） |
+| Method[] getDeclaredMethods()                                | 返回所有成员方法对象的数组，存在就能拿到     |
+| Method getMethod(String name, Class<?>... parameterTypes)    | 返回单个成员方法对象（只能拿public的）       |
+| Method getDeclaredMethod(String name, Class<?>... parameterTypes) | 返回单个成员方法对象，存在就能拿到           |
+
+
+
+**如何获取方法并运行？**
+
+```java
+package com.chikie.basis;
+
+import com.chikie.Entity.Student;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
+public class InflectMethodTest {
+    public static void main(String[] args) throws InvocationTargetException, IllegalAccessException, NoSuchMethodException {
+        Student student = new Student("chikie", 21, "male");
+
+        Class studentClass = Student.class;
+
+        Method[] methods = studentClass.getMethods(); // 获取类的所有public修饰的方法
+        System.out.println(methods.length); // 类的所有public修饰的方法数量，包括父类的方法
+        for(Method method : methods) {
+            System.out.println(method.getName());
+        } // 遍历
+
+        Method gender_method = studentClass.getMethod("getGender"); // 获取getGender方法
+        System.out.println("**********************");
+        System.out.println(gender_method.getName()); // 获取方法名
+        String res = (String) gender_method.invoke(student);// 运行该方法
+        System.out.println(res); // 输出结果
+        System.out.println("**********************");
+
+        Method privateMethod = studentClass.getDeclaredMethod("privateMethod"); // 获取指定私有方法
+        privateMethod.setAccessible(true); // 私有方法必须开启访问权限才能使用，否则报错
+        privateMethod.invoke(student); // 执行
+    }
+}
+
+```
+
+**运行结果**
+
+![image-20240504132439105](D:\Work\Mark\Java Basis\assets\image-20240504132439105.png)
+
+
+
+##### 注意
+
+使用`getMethods()`方法获取类的方法的顺序每次可能不一样（**不固定**），而`getDeclaredFields()`方法获取属性的顺序貌似和类中的顺序是一样的（**固定的**）
+
+
+
+#### 获取类构造方法
+
+| 方法名                                                       | 说明                              |
+| ------------------------------------------------------------ | --------------------------------- |
+| Constructor<?>[] getConstructors()                           | 获得所有的构造（只能public修饰）  |
+| Constructor<?>[] getDeclaredConstructors()                   | 获得所有的构造（包含private修饰） |
+| Constructor<T> getConstructor(Class<?>... parameterTypes)    | 获取指定构造（只能public修饰）    |
+| Constructor<T> getDeclaredConstructor(Class<?>... parameterTypes) | 获取指定构造（包含private修饰）   |
+
+
+
+**获取构造方法来创建对象**
+
+使用`newInstance`方法
+
+```java
+package com.chikie.basis;
+
+import com.chikie.Entity.Student;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
+public class InflectConstructorTest {
+    public static void main(String[] args) throws InvocationTargetException, InstantiationException, IllegalAccessException {
+        Class studentClass = Student.class;
+
+        Constructor[] constructors = studentClass.getConstructors(); // 获取所有public构造方法，这里就不用私有构造方法来演示了，都差不多的
+        System.out.println(constructors.length);
+        for(Constructor constructor : constructors) {
+            System.out.println(constructor.getName());
+        }
+        System.out.println("***********************");
+
+        Constructor noParam_constructor = constructors[0]; // 获取无参构造方法
+        Constructor param_constructor = constructors[1]; // 获取有参构造方法
+
+        Student student1 = (Student) noParam_constructor.newInstance(); // 使用无参构造方法创建对象
+        Student student2 = (Student) param_constructor.newInstance("chikie", 21, "male"); // 使用有参构造方法创建对象
+
+        System.out.println(student1);
+        System.out.println(student2);
+
+    }
+}
+
+```
+
+**结果**
+
+![image-20240504133333787](D:\Work\Mark\Java Basis\assets\image-20240504133333787.png)
 
 
 
