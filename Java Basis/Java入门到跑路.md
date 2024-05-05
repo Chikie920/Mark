@@ -58,7 +58,7 @@ Scanner scanner = new Scanner(System.in);
 // 创建scanner对象，System.in是固定写法，表示从控制台获取输入
 
 String inputStr = scanner.next();
-while (!inputStr.equals("-1")) {
+while (!inputStr.equals("-1")) { // scanner对象读取结束时会返回"-1"
     System.out.println(inputStr);
     inputStr = scanner.nextLine();
 }
@@ -570,7 +570,7 @@ interface Worker {
 
 
 
-#### **补充知识点：**
+#### **补充知识点-获取resource文件夹内文件方法：**
 
 **class.getResource()方法**
 
@@ -1003,7 +1003,77 @@ public class InflectConstructorTest {
 
 ### 注解
 
+注解的格式
 
+```java
+元注解
+public @interface 自定义注解名 {}
+```
+
+**关于注解**
+
+- 注解本质上就是一个**接口**，该接口继承`java.lang.annotation.Annotation`接口
+- 注解类中的抽象方法称为**注解的属性**
+- 注解的属性（抽象方法）的返回值类型必须为：**基本数据类型、String、枚举类、注解类、以上的数组**（普通类、void不能作为返回值）
+- 在使用注解时，需要给注解的属性**赋值**
+
+**对于注解的属性**
+
+- 使用`default 默认值`的形式设置默认值
+- 对于只有一个属性的注解，若其属性的名称为value，则在使用注解时，`@注解名(value = 值)`可简化为`@注解名(值)`
+- 数组赋值时使用{}包裹
+
+**AnnotationTest类**
+
+```java
+package com.chikie.basis;
+
+public class AnnotationTest {
+    @MyAnnotation("chikie")
+    public void method() {
+        System.out.println("....");
+    }
+}
+
+```
+
+**MyAnnotation类**
+
+```java
+package com.chikie.basis;
+
+public @interface MyAnnotation {
+    String value();
+    int age() default 21; // 使用default value的形式设定默认值，这样使用注解的时候可以不用设置值
+}
+
+```
+
+
+
+**元注解**
+
+用于描述注解的注解
+
+-  `@Target`，指定注解可以使用的位置（可以修饰的对象）
+-  `@Retention`，注解可以被保留的阶段
+-  `@Documented`，在使用 javadoc 工具为类生成帮助文档时是否要保留其注解信息
+-  `@Inherited`，使被它修饰的注解具有继承性（如果某个类使用了被@Inherited修饰的注解，则其子类将自动具有该注解）
+
+```java
+package com.chikie.basis;
+
+import java.lang.annotation.*;
+
+@Target({ElementType.TYPE, ElementType.METHOD}) // 表示注解作用于类、方法上
+@Retention(RetentionPolicy.RUNTIME) // 注解保留到运行阶段被运行，RetentionPolicy.SOURCE表示仅保留在源代码阶段，RetentionPolicy.CLASS表示保留到字节码文件阶段
+@Documented
+@Inherited
+public @interface MyAnnotation {
+    String value();
+    int age() default 21; // 使用default value的形式设定默认值，这样使用注解的时候可以不用设置值
+}
+```
 
 
 
@@ -1011,7 +1081,154 @@ public class InflectConstructorTest {
 
 
 
-### Maven
+### Maven篇
 
 
 
+### 日志篇
+
+**参考文献：**https://www.yuque.com/xinblog/javalog
+
+Java日志框架编年史
+
+<img src="D:\Work\Mark\Java Basis\assets\javalogbls.jpg" style="zoom:50%;" />
+
+
+
+#### JCL
+
+JUL 全称 Java Util Logging，它是java原生的日志框架，在java.util.logging包下，主要是使用在小型应用中。
+
+**JCL组件**
+
+<img src="D:\Work\Mark\Java Basis\assets\jul_module.jpg" style="zoom: 50%;" />
+
+- **Logger：**记录器，应用程序通过**获取 Logger 对象**，**调用其 API 来发布日志信息。**Logger通常被认为是访问日志系统的入口程序。
+- **Handler：**处理器，每个 Logger 都会关联一个或者是一组 Handler，**Logger 会将日志交给关联的Handler 去做处理**，由 Handler 负责将日志做记录。Handler 具体实现了日志的输出位置，比如可以输出到控制台或者是文件中等等。
+- **Filter：**过滤器，根据需要定制哪些信息会被记录，哪些信息会被略过。**过滤日志信息**。
+- **Formatter：**格式化组件，它负责**对日志**中的数据和信息进行转换和**格式化**，所以它决定了我们输出日志最终的形式。
+- **Level：**日志的输出级别，每条日志消息都有一个关联的级别。我们根据输出级别的设置，用来展现最终所呈现的日志信息。根据不同的需求，设置不同的级别。
+
+
+
+**示例代码**
+
+```java
+package com.chikie.basis;
+
+import java.util.logging.Logger; // 引入类
+
+public class JCLTest {
+    public static void main(String[] args) {
+        Logger logger = Logger.getLogger("com.chikie.basis.JCLTest");
+        // 使用Logger.getLogger()方法传入本类的全类名获得Logger对象，即可进行本类的日志管理
+
+        logger.severe("严重信息......");
+        logger.warning("警告信息......");
+        logger.info("普通(默认)信息......");
+        logger.config("配置信息......");
+        logger.fine("详细信息(少)......");
+        logger.finer("详细信息(中)......");
+        logger.finest("详细信息(多)......");
+        // 使用Logger对象与相应级别的日志方法可以输出对应日志信息
+    }
+}
+
+```
+
+**输出结果：**
+
+`5月 05, 2024 12:24:22 下午 com.chikie.basis.JCLTest main
+严重: 严重信息......
+5月 05, 2024 12:24:22 下午 com.chikie.basis.JCLTest main
+警告: 警告信息......
+5月 05, 2024 12:24:22 下午 com.chikie.basis.JCLTest main
+信息: 普通(默认)信息......`
+
+**可以看到日志信息只输出到了info级别（默认日志信息级别），比该级别更低的日志信息不会输出，我们可以设置日志信息级别**
+
+```java
+package com.chikie.basis;
+
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger; // 引入类
+import java.util.logging.SimpleFormatter;
+
+public class JCLTest {
+    public static void main(String[] args) {
+        Logger logger = Logger.getLogger("com.chikie.basis.JCLTest");
+        // 使用Logger.getLogger()方法传入本类的全类名获得Logger对象，即可进行本类的日志管理
+
+        // 将默认的日志打印方式关掉
+        // 参数设置为false ，打印日志时就不会按照默认的方式去打印了
+        logger.setUseParentHandlers(false);
+        // 日志处理器：日志处理器有控制台处理器、文件日志处理器等等，这里演示控制台日志处理器
+        ConsoleHandler consoleHandler = new ConsoleHandler();
+        // 设置输出格式
+        SimpleFormatter simpleFormatter = new SimpleFormatter();
+        consoleHandler.setFormatter(simpleFormatter);
+        // 将处理器添加到日志记录器
+        logger.addHandler(consoleHandler);
+        // 设置日志的打印级别
+        // 日志记录器和处理器的级别均需要进行统一的设置，才可以达到日志级别自定义设置的需求
+        consoleHandler.setLevel(Level.FINE);
+        logger.setLevel(Level.FINE); // 不进行上述操作只设置该代码不会起任何作用
+
+        logger.severe("严重信息......");
+        logger.warning("警告信息......");
+        logger.info("普通(默认)信息......");
+        logger.config("配置信息......");
+        logger.fine("详细信息(少)......");
+        logger.finer("详细信息(中)......");
+        logger.finest("详细信息(多)......");
+        // 使用Logger对象与相应级别的日志方法可以输出对应日志信息
+    }
+}
+
+```
+
+**结果：**
+
+`5月 05, 2024 12:49:07 下午 com.chikie.basis.JCLTest main
+严重: 严重信息......
+5月 05, 2024 12:49:07 下午 com.chikie.basis.JCLTest main
+警告: 警告信息......
+5月 05, 2024 12:49:07 下午 com.chikie.basis.JCLTest main
+信息: 普通(默认)信息......
+5月 05, 2024 12:49:07 下午 com.chikie.basis.JCLTest main
+配置: 配置信息......
+5月 05, 2024 12:49:07 下午 com.chikie.basis.JCLTest main
+详细: 详细信息(少)......`
+
+**个人感觉这样做有点麻烦......**
+
+
+
+**将日志信息输出到文件**
+
+创建`FileHandler`对象，大部分代码相同
+
+```java
+public void JULFileTest() throws IOException {
+    Logger logger = Logger.getLogger("com.chikie.basis.JULTest");
+    logger.setUseParentHandlers(false);
+    FileHandler fileHandler = new FileHandler("./Log.txt");
+    // 创建FileHandler对象，传入存储日志信息文件位置
+    SimpleFormatter simpleFormatter = new SimpleFormatter(); // 创建格式类
+    fileHandler.setFormatter(simpleFormatter); // 给handler设置格式
+    logger.addHandler(fileHandler); // 给logger对象设置handler
+    fileHandler.setLevel(Level.FINE);
+    logger.setLevel(Level.FINE); // 设置日志级别
+
+    logger.severe("严重信息......");
+    logger.warning("警告信息......");
+    logger.info("普通(默认)信息......");
+    logger.config("配置信息......");
+    logger.fine("详细信息(少)......");
+    logger.finer("详细信息(中)......");
+    logger.finest("详细信息(多)......");
+}
+```
+
+![image-20240505133121037](D:\Work\Mark\Java Basis\assets\image-20240505133121037.png)

@@ -784,3 +784,10 @@ public class SpringTest {
 1. **xml配置文件中加入context命名空间**
 2. **<context:property-placeholder location="配置文件名"></context:property-placeholder>**
 3. **在bean的`value`属性中(冒号内)使用`${参数名}`来引用配置文件中的参数**
+
+
+
+## 全注解开发
+
+不采用XML配置文件
+
