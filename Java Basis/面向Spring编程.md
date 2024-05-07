@@ -789,5 +789,340 @@ public class SpringTest {
 
 ## 全注解开发
 
-不采用XML配置文件
+不采用XML配置文件，使用配置类来进行Spring的配置
 
+
+
+### **常用注解**
+
+- `@Component`，作用与类上，将该类交给Spring管理(作为bean)，相当于
+
+```xml
+<bean id="xxx" class="com.chikie.entity.xxx"></bean>
+```
+
+​		其中xxx可以作为`@Component参数`进行设置
+
+- `@Configuration`，表示本类为Spring配置类，用于取代XML配置文件
+- `@ComponentScan`，开启包扫描
+- `@Controller`，功能同上，相当于别名，通常用于SpringMVC中，标识将**控制类**作为bean交给Spring管理
+- `@Service`，同上，标识将**服务类**作为bean交给Spring管理
+- `@Repository`，同上，标识将**实体类**作为bean交给Spring管理
+
+- `@Value`，用于进行**基本数据类型**的数据**注入**
+- `@Autowired`，表示开启自动装配(按照类别进行注入)，在需要进行**bean对象自动注入**的位置使用，不可直接修饰类
+- `@Qualifier`，通常与`@Autowired`注解一同使用，自动装配默认按照类别进行注入，当同一类有多个实现时需要使用`@Qualifier`注解进行区分
+- `@Resource`，该注解属于JDK，功能与`@Autowired`类似，不过它默认根据提供的名称进行注入
+
+
+
+### 全注解配置、构造方法注入与属性注入示例
+
+
+
+**项目结构**
+
+![image-20240507192045476](D:\Work\Mark\Java Basis\assets\image-20240507192045476.png)
+
+**SpringConfig类**
+
+```java
+package com.chikie.config;
+
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration // Spring配置类注解，加上这个才会被作为配置类
+@ComponentScan({"com.chikie.entity"}) // 开启包扫描，扫描包下的Spring注解，并进行处理
+public class SpringConfig {
+}
+
+```
+
+**Student类**
+
+```java
+package com.chikie.entity;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Repository;
+
+@Repository // 没有指定名称则默认为类名开头小写
+public class Student {
+    private String name;
+    private int age;
+    private Dog dog;
+
+    public Student(@Value("chikie") String name, @Value("21") int age, @Autowired Dog dog) { // 构造方法注入
+        System.out.println("有参方法被调用");
+        this.name = name;
+        this.age = age;
+        this.dog = dog;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public Dog getDog() {
+        return dog;
+    }
+
+    public void setDog(Dog dog) {
+        this.dog = dog;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                ", dog=" + dog +
+                '}';
+    }
+}
+
+```
+
+**Dog类**
+
+```java
+package com.chikie.entity;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+@Component("myDog")
+public class Dog {
+    @Value("布鲁斯") // 属性注入
+    private String name;
+    @Value("1") // 属性注入
+    private int age;
+
+    public Dog() {
+        System.out.println("无参构造被调用");
+    }
+
+    public Dog(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Dog{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+
+```
+
+**SpringTest类**
+
+```java
+package com.chikie.test;
+
+import com.chikie.config.SpringConfig;
+import com.chikie.entity.Dog;
+import com.chikie.entity.Student;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class SpringTest {
+    @Test
+    public void methodOne() {
+        ApplicationContext applicationContext = new AnnotationConfigApplicationContext(SpringConfig.class);
+        Dog myDog = applicationContext.getBean("myDog", Dog.class);
+        System.out.println(myDog);
+        Student student = applicationContext.getBean("student", Student.class);
+        System.out.println(student);
+    }
+}
+
+```
+
+**运行结果：**
+
+`无参构造被调用
+有参方法被调用
+Dog{name='布鲁斯', age=1}
+Student{name='chikie', age=21, dog=Dog{name='布鲁斯', age=1}}`
+
+
+
+#### 注意
+
+**更改后的Student类-加上了无参构造方法**
+
+```java
+package com.chikie.entity;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Repository;
+
+@Repository // 没有指定名称则默认为类名开头小写
+public class Student {
+    private String name;
+    private int age;
+    private Dog dog;
+
+    public Student() {
+        System.out.println("Student无参构造方法被调用");
+    } // 加上了无参构造方法
+
+    public Student(@Value("chikie") String name, @Value("21") int age, @Autowired Dog dog) { // 构造方法注入
+        System.out.println("有参方法被调用");
+        this.name = name;
+        this.age = age;
+        this.dog = dog;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public Dog getDog() {
+        return dog;
+    }
+
+    public void setDog(Dog dog) {
+        this.dog = dog;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                ", dog=" + dog +
+                '}';
+    }
+}
+
+```
+
+**运行结果：**
+
+`无参构造被调用
+Student无参构造方法被调用
+Dog{name='布鲁斯', age=1}
+Student{name='null', age=0, dog=null}`
+
+**可见，当无参与有参同时存在时，Spring优先使用无参构造方法生成对象**
+
+
+
+### **set注入**
+
+注意SET注入不能作用于参数，必须作用于SET函数
+
+**Student类**
+
+```java
+package com.chikie.entity;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Repository;
+
+@Repository // 没有指定名称则默认为类名开头小写
+public class Student {
+    private String name;
+    private int age;
+    private Dog dog;
+
+    public Student() {
+        System.out.println("Student无参构造方法被调用");
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    @Value("chikie") // set方法注入
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    @Value("21")
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+
+    public Dog getDog() {
+        return dog;
+    }
+
+    @Autowired
+    public void setDog(Dog dog) {
+        this.dog = dog;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                ", dog=" + dog +
+                '}';
+    }
+}
+
+```
+
+**运行结果：**
+
+`无参构造被调用
+Student无参构造方法被调用
+Dog{name='布鲁斯', age=1}
+Student{name='chikie', age=21, dog=Dog{name='布鲁斯', age=1}}`
