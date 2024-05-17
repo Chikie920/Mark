@@ -92,7 +92,7 @@ public class Dog {
 
 `id属性`，Spring管理的bean的**唯一**标识，不可重复
 
-`name属性`，bean的别名
+`name属性`，bean的别名，不能重复
 
 `class属性`，纳入管理类的全类名
 
@@ -388,7 +388,7 @@ Dog{name='布鲁斯', age=1}`
 
 #### 引用注入
 
-值注入为基本数据类型的数据注入，而引用注入则是对于对象的注入
+**值注入**为**基本数据类型的数据注入**，而**引用注入**则是对于**对象的注入**
 
 
 
@@ -632,7 +632,7 @@ Student{name='chikie', age=21, dog=Dog{name='布鲁斯', age=1}}`
 
 #### 探究
 
-**当使用`byType`进行自动装配时，如果有两个级以上的满足要求的类别时，结果会怎样？**
+**当使用`byType`进行自动装配时，如果有两个及以上的满足要求的类别时，结果会怎样？**
 
 ![image-20240503144731212](D:\Work\Mark\Java Basis\assets\image-20240503144731212.png)
 
@@ -644,7 +644,7 @@ Student{name='chikie', age=21, dog=Dog{name='布鲁斯', age=1}}`
 
 首先要了解Spring XML配置文件中的**命名空间**的概念 [链接](https://zhuanlan.zhihu.com/p/194263065)
 
-简要概括一下，命名空间是来自XML文件的概念，主要是用来引入标签的。
+简要概括一下，命名空间是来自XML文件的概念，主要是用来引入标签来使用的。
 
 
 
@@ -1126,3 +1126,305 @@ public class Student {
 Student无参构造方法被调用
 Dog{name='布鲁斯', age=1}
 Student{name='chikie', age=21, dog=Dog{name='布鲁斯', age=1}}`
+
+
+
+## 手写IOC功能
+
+### 功能分析
+
+- 读取并解析XML配置文件
+- 类的实例化
+- 依赖注入的实现
+
+
+
+### 项目结构
+
+![image-20240517193203448](D:\Work\Mark\Java Basis\assets\image-20240517193203448.png)
+
+
+
+### 读取并解析XML配置文件
+
+**XMLUtil类**
+
+使用dom4j来对xml进行解析
+
+```java
+package com.chikie.util;
+
+import org.dom4j.Document;
+import org.dom4j.DocumentException;
+import org.dom4j.Node;
+import org.dom4j.io.SAXReader;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class XMLUtil {
+
+    public static Document parse(String url) {
+        SAXReader saxReader = new SAXReader(); // 创建XML文件解析器
+        Document document = null;
+        try {
+            document = saxReader.read(url); // 从一个给定的文件构建一个完整的dom4j树
+        } catch (DocumentException e) {
+            throw new RuntimeException(e);
+        }
+        return document;
+    } // 读取并解析XML文件
+
+    public static Map<String, Map<String, String>> getBeans(Document document) {
+        HashMap<String, Map<String, String>> beanMap = new HashMap<>(); // Map为<id<全类名, 别名>>
+        List<Node> beanNodes = document.selectNodes("//bean"); // 获取xml文件中所有bean结点
+        List<String> idList = new ArrayList<>();
+        List<String> nameList = new ArrayList<>();
+
+        String id, name, className;
+        for (Node node : beanNodes) {
+            id = node.valueOf("@id");
+            name = node.valueOf("@name");
+            className = node.valueOf("@class");
+            // 获取bean标签属性值
+
+            if (idList.contains(id)) {
+                throw new RuntimeException("bean的id值必须唯一");
+            } else {
+                idList.add(id);
+            }
+            if (nameList.contains(name)) {
+                throw new RuntimeException("bean的name值必须唯一");
+            } else {
+                nameList.add(name);
+            }
+            // 确保id与name的唯一性
+
+            HashMap<String, String> nameMap = new HashMap<>(); // <全类名, 别名>
+
+            if (className.length() == 0) {
+                throw new RuntimeException("XML Bean class不能为空");
+            }
+            if (id.length() == 0) {
+                throw new RuntimeException("XML Bean标签id属性必须赋值");
+            }
+            if (name.length() == 0) {
+                name = id;
+            }
+
+            nameMap.put(className, name);
+            beanMap.put(id, nameMap);
+        }
+
+        return beanMap;
+    } // 获取目标bean结点属性
+
+
+}
+
+```
+
+### 类的实例化
+
+这里只实现Spring创建bean的单例模式，多例模式较简单这里就不写了
+
+**XMLApplicationContext类**
+
+```java
+package com.chikie.ioc;
+
+import com.chikie.util.XMLUtil;
+import org.dom4j.Document;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+
+public class XMLApplicationContext {
+    private static Document document;
+    private static Map<Object, Map<String, String>> beanMap = new HashMap<>(); // 存放管理的bean与id、name
+
+    public XMLApplicationContext(String url) {
+        this.document = XMLUtil.parse(url);
+        init();
+    }
+
+    private void init() {
+        Map<String, Map<String, String>> beansMap = XMLUtil.getBeans(document);
+        beansMap.forEach((id, map) -> {
+            map.forEach((className, name) -> {
+                try {
+                    Class claz = Class.forName(className); // 获取目标类Class
+                    Object bean = claz.getDeclaredConstructor().newInstance(); // 目标类实例化
+                    HashMap<String, String> idAndNameMap = new HashMap<>();
+                    idAndNameMap.put(id, name);
+                    beanMap.put(bean, idAndNameMap);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                } catch (NoSuchMethodException e) {
+                    throw new RuntimeException(e);
+                } catch (InvocationTargetException e) {
+                    throw new RuntimeException(e);
+                } catch (InstantiationException e) {
+                    throw new RuntimeException(e);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        });
+    } // 初始方法 创建bean
+
+    public Object getBean(String str) {
+        AtomicReference<Object> res = new AtomicReference<>();
+        beanMap.forEach((bean, map)->{
+            map.forEach((id, name)->{
+                if(id.equals(str) || name.equals(str)) {
+                    res.set(bean);
+                }
+            });
+        });
+        return res;
+    } // 获取bean
+
+}
+
+```
+
+
+
+**Student类**
+
+```java
+package com.chikie.entity;
+
+public class Student {
+    private String name;
+    private int age;
+
+    public Student() {
+    }
+
+    public Student(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+
+```
+
+**Dog类**
+
+```java
+package com.chikie.entity;
+
+public class Dog {
+    private String name;
+    private String type;
+
+    public Dog() {
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    @Override
+    public String toString() {
+        return "Dog{" +
+                "name='" + name + '\'' +
+                ", type='" + type + '\'' +
+                '}';
+    }
+}
+
+```
+
+
+
+**XML配置文件**
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans>
+    <bean id="chikie" name="aStudent" class="com.chikie.entity.Student">
+        <property name="name" value="chikie"></property>
+        <property name="age" value="21"></property>
+    </bean>
+    <bean id="john" name="bStudent" class="com.chikie.entity.Student"></bean>
+    <bean id="myDog" name="dog" class="com.chikie.entity.Dog"></bean>
+</beans>
+```
+
+
+
+**测试类MySpringTest**
+
+```java
+package com.chikie.test;
+
+import com.chikie.ioc.XMLApplicationContext;
+import org.junit.jupiter.api.Test;
+
+public class MySpringTest {
+    @Test
+    public void getElementTest() {
+        XMLApplicationContext xmlApplicationContext = new XMLApplicationContext(MySpringTest.class.getClassLoader().getResource("MySpringC" +
+                "onfig.xml").getPath());
+        Object bean = xmlApplicationContext.getBean("chikie"); // 使用id获取bean
+        System.out.println(bean);
+        Object dog = xmlApplicationContext.getBean("dog"); // 使用别名获取bean
+        System.out.println(dog);
+    }
+}
+
+```
+
+
+
+**运行结果**
+
+`Student{name='null', age=0}
+Dog{name='null', type='null'}`
+
+
+
+### 依赖注入功能实现

@@ -1232,3 +1232,71 @@ public void JULFileTest() throws IOException {
 ```
 
 ![image-20240505133121037](D:\Work\Mark\Java Basis\assets\image-20240505133121037.png)
+
+
+
+
+
+### XML篇
+
+#### Dom4J
+
+[官方文档](https://dom4j.github.io/)
+
+[官方示例](https://github.com/dom4j/dom4j/wiki/Cookbook)
+
+这里只介绍读取与查询
+
+**resources/config.xml**
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+    <student id="astudent">
+        <property name="name" value="chikie"></property>
+        <property name="age" value="21"></property>
+    </student>
+    <student id="bstudent"></student>
+</root>
+```
+
+**XMLTest**
+
+```java
+package com.chikie.basis;
+
+import org.dom4j.Document;
+import org.dom4j.DocumentException;
+import org.dom4j.Node;
+import org.dom4j.io.SAXReader;
+
+import java.util.List;
+
+public class XMLTest {
+    public static void main(String[] args) throws DocumentException {
+        SAXReader saxReader = new SAXReader();
+        Document document = saxReader.read(XMLTest.class.getClassLoader().getResource("config.xml").getPath()); // 读取并解析xml配置文件
+        List<Node> nodes = document.selectNodes("//student"); // 使用xpath获取匹配结点
+        for (Node node : nodes) {
+            System.out.println(node.getName()); // 获取结点名称
+            System.out.println(node.valueOf("@id")); // 获取结点给定属性值，属性名称前要加@符号
+        }
+        System.out.println("********************");
+        Node studentA = nodes.get(0); // 获取第一个student结点
+        Node node = studentA.selectSingleNode("property");// 该方法获取第一个匹配的结点
+        System.out.println(node.getName());
+        System.out.println(node.valueOf("@value"));
+
+    }
+}
+```
+
+**运行结果：**
+
+`student
+astudent
+student
+bstudent`
+
+`property
+chikie`
