@@ -947,6 +947,10 @@ public class InflectMethodTest {
 
 
 
+对于`getMethod`与`getDeclaredMethod`这两个获取指定method的方法，若类的method参数不为空，则在使用这两个方法时加上类中method对应参数的类型，否则会出现找不到方法的错误。
+
+
+
 #### 获取类构造方法
 
 | 方法名                                                       | 说明                              |

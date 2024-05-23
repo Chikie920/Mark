@@ -1,5 +1,9 @@
 # Java之Spring也干了
 
+[^作者]: Chikie
+
+[作者博客]: https://chikie920.github.io/
+
 
 
 **本文档基于Spring6，其要求JDK17及以上**
@@ -1129,7 +1133,7 @@ Student{name='chikie', age=21, dog=Dog{name='布鲁斯', age=1}}`
 
 
 
-## 手写IOC功能
+## 手写IOC与DI功能
 
 ### 功能分析
 
@@ -1142,6 +1146,57 @@ Student{name='chikie', age=21, dog=Dog{name='布鲁斯', age=1}}`
 ### 项目结构
 
 ![image-20240517193203448](D:\Work\Mark\Java Basis\assets\image-20240517193203448.png)
+
+
+
+### **Mavn配置**
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.example</groupId>
+    <artifactId>MySpring</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.10.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.dom4j</groupId>
+            <artifactId>dom4j</artifactId>
+            <version>2.1.4</version>
+        </dependency>
+
+        <dependency>
+            <groupId>jaxen</groupId>
+            <artifactId>jaxen</artifactId>
+            <version>2.0.0</version>
+        </dependency>
+        <!--dom4j xpath解析依赖-->
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.14.0</version>
+        </dependency>
+        <!--使用apache StringUtils类进行String操作-->
+    </dependencies>
+</project>
+```
 
 
 
@@ -1428,3 +1483,177 @@ Dog{name='null', type='null'}`
 
 
 ### 依赖注入功能实现
+
+点到即止，这里只实现值注入，注解实现也懒得写了，这里就抛砖引玉
+
+**XMLUtil类 新增方法**
+
+```java
+public static List<String> getProperty(Document document) {
+    List<Node> beans = document.selectNodes("//bean"); // 获取xml中的所有bean结点
+    List<String> beansID = new ArrayList<>();
+    for (Node bean : beans) {
+        int size = bean.selectNodes("property").size();
+        if (size == 0) {
+            continue;
+        }
+        String beanID = bean.valueOf("@id");
+        beansID.add(beanID);
+    }
+    return beansID;
+} // 获取含有property标签的bean id
+
+public static <T> void valueDI(T object, String beanID, Document document) {
+    Node node = document.selectSingleNode("//bean[@id='" + beanID + "']"); // 获取对应bean结点
+    String className = node.valueOf("@class"); // 获取对应类名
+    Class aClass = null;
+    try {
+        aClass = Class.forName(className);
+    } catch (ClassNotFoundException e) {
+        throw new RuntimeException(e);
+    }
+    Method[] declaredMethods = aClass.getDeclaredMethods(); // 获取类的所有方法
+    List<Node> property = node.selectNodes("property");
+    for (Node p : property) {
+        String methodName = "set"+StringUtils.capitalize(p.valueOf("@name")); // 获取方法名称
+        String value = p.valueOf("@value"); // 获取要传入方法的参数值
+        try {
+            for(Method method : declaredMethods) {
+                if(method.getName().equals(methodName)) {
+                    String methodParamType = method.getParameterTypes()[0].getTypeName();
+                    if(methodParamType.equals("int")) {
+                        method.invoke(object, Integer.valueOf(value)); // 执行方法
+                    } else {
+                        method.invoke(object, value); // 执行方法
+                    }
+                    break;
+                }
+            }  // 获取指定方法
+        } catch (InvocationTargetException e) {
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+} // 依赖注入功能实现
+```
+
+
+
+**XMLApplicationContext类**
+
+```java
+package com.chikie.ioc;
+
+import com.chikie.util.XMLUtil;
+import org.dom4j.Document;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+
+public class XMLApplicationContext {
+    private static Document document;
+    private static Map<Object, Map<String, String>> beanMap = new HashMap<>(); // 存放管理的bean与id、name
+
+    public XMLApplicationContext(String url) {
+        this.document = XMLUtil.parse(url);
+        init();
+    }
+
+    private void init() {
+        Map<String, Map<String, String>> beansMap = XMLUtil.getBeans(document);
+        beansMap.forEach((id, map) -> {
+            map.forEach((className, name) -> {
+                try {
+                    Class claz = Class.forName(className); // 获取目标类Class
+                    Object bean = claz.getDeclaredConstructor().newInstance(); // 目标类实例化
+                    HashMap<String, String> idAndNameMap = new HashMap<>();
+                    idAndNameMap.put(id, name);
+                    beanMap.put(bean, idAndNameMap);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                } catch (NoSuchMethodException e) {
+                    throw new RuntimeException(e);
+                } catch (InvocationTargetException e) {
+                    throw new RuntimeException(e);
+                } catch (InstantiationException e) {
+                    throw new RuntimeException(e);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        });
+        beanDI(); // ******调用依赖注入函数******
+    } // 初始方法 创建bean与依赖注入
+
+    public Object getBean(String str) {
+        AtomicReference<Object> res = new AtomicReference<>();
+        beanMap.forEach((bean, map)->{
+            map.forEach((id, name)->{
+                if(id.equals(str) || name.equals(str)) {
+                    res.set(bean);
+                }
+            });
+        });
+        return res.get();
+    } // 获取bean对象
+
+    public void beanDI() {
+        List<String> beansID = XMLUtil.getProperty(document);
+        beansID.forEach(s->{
+            Object bean = getBean(s);
+            XMLUtil.valueDI(getBean(s), s, document);
+        });
+
+    } // 实现依赖注入功能
+
+}
+```
+
+**运行结果**
+
+`Student{name='chikie', age=21}
+Dog{name='null', type='null'}`
+
+
+
+## Spring重量级之AOP
+
+用于代码复用
+
+
+
+Spring对AOP的实现包括以下3种方式：
+**●**第一种方式：Spring框架结合AspectJ框架实现的AOP，基于注解方式。
+**●**第二种方式：Spring框架结合AspectJ框架实现的AOP，基于XML方式。
+●第三种方式：Spring框架自己实现的AOP，基于XML配置方式。
+
+实际开发中，都是Spring+AspectJ来实现AOP。
+
+
+
+### 用人话来进行概念介绍
+
+- **连接点** `Joinpoint`：在程序的整个执行流程中，可以织入切面的位置。方法的执行前后，异常抛出之后等位置。
+
+- **切点** `Pointcut`：在程序执行流程中，真正织入切面的方法。（一个切点对应多个连接点）
+
+- **通知** `Advice`：通知又叫增强，就是具体你要织入的代码。
+
+  **通知包括：**
+
+  - **前置通知**@Before
+  - **后置通知**@
+  - **环绕通知**
+  - **异常通知**
+  - **最终通知**
+
+- **切面** `Aspect`：切点 + 通知就是切面。
+
+
+
+### 全注解AOP示例
