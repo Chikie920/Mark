@@ -1638,22 +1638,209 @@ Spring对AOP的实现包括以下3种方式：
 
 ### 用人话来进行概念介绍
 
-- **连接点** `Joinpoint`：在程序的整个执行流程中，可以织入切面的位置。方法的执行前后，异常抛出之后等位置。
+- **连接点** `Joinpoint`：可以在目标方法中插入代码的位置。比如目标函数执行之前、执行之后、发生异常时、返回结果后......具体看后面的例子就懂了。
 
-- **切点** `Pointcut`：在程序执行流程中，真正织入切面的方法。（一个切点对应多个连接点）
+- **切点** `Pointcut`：一个切点对应多个连接点，就是目标函数的意思，一个目标方法就是一个切点(目标函数中可以插入代码的连接点的集合)。
 
-- **通知** `Advice`：通知又叫增强，就是具体你要织入的代码。
+- **通知** `Advice`：通知又叫增强，就是你要在目标方法中加入(嵌入)的代码。
 
   **通知包括：**
 
-  - **前置通知**@Before
-  - **后置通知**@
-  - **环绕通知**
-  - **异常通知**
-  - **最终通知**
+  - **前置通知**`@Before`，在方法执行之前进行通知
+  - **返回通知**`@AfterReturning`，方法return返回之后通知，方法结束之前执行（异常不执行，因为方法发生异常的地方都在return前，所以无法执行return操作）
+  - **后置通知**`@After`，目标方法执行结束之后通知（不管是否发生异常始终执行）
+  - **环绕通知**`@Around`，环绕方法通知(没有异常时在前置通知前，在后置通知后；发生异常时，前置通知不变后置通知不执行)
+  - **异常通知**`@AfterThrowing`，异常发生时通知（在后置通知之前）
 
 - **切面** `Aspect`：切点 + 通知就是切面。
 
 
 
 ### 全注解AOP示例
+
+**代码结构**
+
+![image-20240523133137590](D:\Work\Mark\Java Basis\assets\image-20240523133137590.png)
+
+**Maven依赖**
+
+```xml
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-context</artifactId>
+    <version>6.1.6</version>
+</dependency>
+<!--Spring框架核心依赖-->
+
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-aop</artifactId>
+    <version>6.1.6</version>
+</dependency>
+<!--AOP依赖-->
+
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-aspects</artifactId>
+    <version>6.1.6</version>
+</dependency>
+<!--AOP依赖-->
+```
+
+**AopConfig类-配置类**
+
+```java
+package com.chikie.aop;
+
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
+
+@Configuration // 表明这是一个Spring配置类
+@ComponentScan({"com.chikie.aop"}) // 开启包扫描
+@EnableAspectJAutoProxy(proxyTargetClass = true) // 开启注解格式AOP功能
+public class AopConfig {
+}
+
+```
+
+**MyService类-包含需要进行增强方法的类**
+
+```java
+package com.chikie.aop;
+
+import org.springframework.stereotype.Component;
+
+@Component("service")
+public class MyService {
+
+    public Integer methodOne() {
+        System.out.println("method one......");
+        return 1;
+    }
+
+    public Integer methodTwo() {
+        System.out.println("method two......");
+        int num = 1/0;
+        return -1;
+    }
+}
+```
+
+**MyAdvice-切面类-即包含通知的类**
+
+切点表达式怎么写这里不再赘述
+
+```java
+package com.chikie.aop;
+
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.*;
+import org.springframework.stereotype.Component;
+
+@Component
+@Aspect // 设置当前类为AOP切面类
+public class MyAdvice {
+    @Before("execution(* com.chikie.aop.MyService.methodOne(..))")
+    public void adviceOne() {
+        System.out.println("methodOne前置通知");
+    }
+
+    @AfterReturning(value = "execution(* com.chikie.aop.MyService.methodOne(..))", returning = "returnValue")
+    public void adviceTwo(Object returnValue) {
+        System.out.println("返回通知: 获取methodOne返回值为" + returnValue);
+    }
+
+    @After("execution(* com.chikie.aop.MyService.methodOne(..))")
+    public void adviceThree() {
+        System.out.println("methodOne后置通知");
+    }
+
+    @Around("execution(* com.chikie.aop.MyService.methodOne(..))")
+    public void adviceFour(ProceedingJoinPoint proceedingJoinPoint) throws Throwable {
+        System.out.println("methodOne环绕开始通知");
+        proceedingJoinPoint.proceed();
+        System.out.println("methodOne环绕结束通知");
+    }
+
+    @Pointcut("execution(* com.chikie.aop.MyService.methodTwo(..))")
+    public void methodTwoPointcut() {
+    } // 切点表达式的复用写法
+
+    @Before("methodTwoPointcut()") // 直接使用函数名进行切点表达式复用
+    public void adviceFive() {
+        System.out.println("methodTwo前置通知");
+    }
+
+    @After("methodTwoPointcut()")
+    public void adviceSix() {
+        System.out.println("methodTwo后置通知");
+    }
+
+    @AfterReturning("methodTwoPointcut()")
+    public void adviceSeven() {
+        System.out.println("methodTwo返回后通知");
+    }
+
+    @AfterThrowing("methodTwoPointcut()")
+    public void adviceEight() {
+        System.out.println("methodTwo异常通知");
+    }
+
+    @Around("methodTwoPointcut()")
+    public void adviceNine(ProceedingJoinPoint proceedingJoinPoint) throws Throwable {
+        System.out.println("methodTwo环绕前通知");
+        proceedingJoinPoint.proceed();
+        System.out.println("methodTwo环绕后通知");
+    }
+}
+
+```
+
+**AopTest-测试类**
+
+```java
+package com.chikie.aop;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class AopTest {
+    public static void main(String[] args) {
+        ApplicationContext applicationContext = new AnnotationConfigApplicationContext(AopConfig.class);
+        MyService service = applicationContext.getBean("service", MyService.class);
+
+        service.methodOne();
+        System.out.println("");
+        try {
+            service.methodTwo();
+        } catch (Exception e) {
+            System.out.println("异常捕捉");
+        }
+    }
+}
+
+```
+
+**结果**
+
+![image-20240523133739475](D:\Work\Mark\Java Basis\assets\image-20240523133739475.png)
+
+#### 通知的执行规律
+
+本教程采用Spring6版本，可能因为版本不同而有所差异
+
+![](D:\Work\Mark\Java Basis\assets\mark.png)
+
+#### 通知获取函数返回值
+
+
+
+#### ProceedingJoinPoint探究
+
+
+
+#### **注意**
+
+不管是要增强的类-**目标类**(包含需要增强方法的类)还是**通知类**(增强代码)都需要纳入Spring管理，并且通知类需要使用**@Aspect**注解标注
+
