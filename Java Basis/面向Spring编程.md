@@ -1832,15 +1832,30 @@ public class AopTest {
 
 ![](D:\Work\Mark\Java Basis\assets\mark.png)
 
-#### 通知获取函数返回值
+#### 返回后通知获取函数返回值
+
+`@AfterReturning`注解有一个参数`returning`，可以获取函数返回值，使用方法如下
+
+```java
+@AfterReturning(value="切点表达式", returning="变量名")
+public void advice(Object 变量名) { // 注意上下变量名要相同，且接收类型为Object
+    /**增强代码**/
+}
+```
 
 
 
 #### ProceedingJoinPoint探究
+
+`Proceedingjoinpoint` 继承了 `JoinPoint`。在`JoinPoint`的基础上暴露出 `proceed` 这个方法，能够继续执行目标函数。
 
 
 
 #### **注意**
 
 不管是要增强的类-**目标类**(包含需要增强方法的类)还是**通知类**(增强代码)都需要纳入Spring管理，并且通知类需要使用**@Aspect**注解标注
+
+
+
+## 事务
 
