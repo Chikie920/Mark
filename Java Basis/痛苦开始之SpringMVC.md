@@ -38,7 +38,7 @@ SpringMVC是一个实现了MVC架构模式的Web框架，底层基于Servlet实�
 
 
 
-## 第一个SpringMVC程序
+## 第一个SpringMVC程序-基于XML配置方式
 
 ### 项目创建
 
@@ -141,7 +141,9 @@ Spring MVC框架是围绕`DispatcherServlet`来设计的，`DispatcherServlet`�
 
 ### SpringMVC配置
 
-#### 默认方式配置
+#### 配置文件存放位置与名称设置
+
+##### 默认方式配置
 
 如果采用上面的`web.xml`文件配置，则为默认方式配置，**必须将SpringMVC配置文件放在`WEB-INF`文件夹下**，即`web.xml`同目录下，并且配置文件名必须为`web.xml`中配置的servlet的别名-servlet的形式，以上面的为例`SpringServlet-servlet.xml`
 
@@ -149,4 +151,359 @@ Spring MVC框架是围绕`DispatcherServlet`来设计的，`DispatcherServlet`�
 
 
 
-#### 自定义配置
+##### 自定义配置
+
+自定义springmvc配置文件位置与文件名
+
+在`servlet`标签中新增`<init-param>`标签如下
+
+```xml
+<servlet> <!--引入用于处理请求的servlet，让tomcat能够根据配置进行调用-->
+    <servlet-name>springmvc</servlet-name> <!--定义servet的名称(别名)-->
+    <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class> <!--servlet类的全类名-->
+    <init-param>
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:springmvc-config.xml</param-value> <!--表示改配置文件位于main/resources目录下名为springmvc-config.xml-->
+    </init-param>
+</servlet>
+```
+
+
+
+##### 其他标签
+
+**`load-on-startup`标签**
+
+一般我们在开发web应用时，都会配置这个参数，有两个好处：
+
+1. 如果初始化过程失败，则容器会提示启动失败，此时我们能够提前知道相关错误
+2. 配置该参数相当于将初始化servlet的工作转移到容器启动过程，使得容器只要启动成功后，就可立即响应web请求，否则可能会等一小会进行加载
+
+```xml
+<servlet> <!--引入用于处理请求的servlet，让tomcat能够根据配置进行调用-->
+    <servlet-name>springmvc</servlet-name> <!--定义servet的名称(别名)-->
+    <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class> <!--servlet类的全类名-->
+    <init-param>
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:springmvc-config.xml</param-value>
+    </init-param>
+    <load-on-startup>1</load-on-startup>
+    <!--值大于或等于0时，在程序启动期间即加载这个servlet，默认或者小于0时，等到tomcat调用servlet时才被加载-->
+</servlet>
+```
+
+
+
+#### SpringMVC配置文件编写
+
+就使用IDEA新建spring的配置文件即可，第一个程序这里不用编写即可运行
+
+```java
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       https://www.springframework.org/schema/context/spring-context.xsd">
+
+	<!--	<mvc:annotation-driven />  后续如果要使用XML配置方式进行请求的拦截与处理，需要加上该标签表示启用SpringMVC功能 由于后面的例子都将采用注解的形式，只在这里进行说明 -->
+
+</beans>
+```
+
+
+
+### 蜜汁404问题
+
+初学者大概率会在运行第一个程序时出现404的错误，可能原因之一是Tomcat资源访问的问题(Servlet不知道要将静态资源交给哪个Servlet处理)
+
+如果你使用.html后缀的页面文件(如index.html)就会404，而.jsp后缀的就不会，下面贴一下原因，这里引用知乎上面的回答
+
+> Tomcat访问所有的资源，都是用Servlet来实现的。
+>
+> 在Tomcat看来，资源分3种
+>
+> 1. 静态资源，如css,html,js,jpg,png等
+> 2. Servlet
+> 3. JSP
+>
+> 对于静态资源，Tomcat最后会交由一个叫做DefaultServlet的类来处理
+>
+> 对于Servlet ，Tomcat最后会交由一个叫做 InvokerServlet的类来处理
+>
+> 对于JSP，Tomcat最后会交由一个叫做JspServlet的类来处理
+>
+> 所以Tomcat又叫Servlet容器嘛，什么都交给Servlet来处理。
+>
+> 那么什么时候调用哪个Servlet呢？ 有一个类叫做org.apache.tomcat.util.http.mapper.Mapper，它一共进行了7个大的规则判断，第7个，就是判断是否是该用DefaultServlet。
+>
+> 简单地说。。。先看是不是servlet,然后看是不是[jsp](https://www.zhihu.com/search?q=jsp&search_source=Entity&hybrid_search_source=Entity&hybrid_search_extra={"sourceType"%3A"answer"%2C"sourceId"%3A154753720})，如果都不是，那么就是你DefaultServlet的活儿了。
+
+[知乎]: tomcat中对静态资源的访问也会用servlet来处理吗？-meepo的回答-知乎
+
+所以我们需要在web.xml中配置默认的servlet--DefaultServlet来处理静态资源，更改后的代码如下
+
+**web.xml**
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd"
+         version="4.0">
+
+    <servlet> <!--引入用于处理请求的servlet，让tomcat能够根据配置进行调用-->
+        <servlet-name>springmvc</servlet-name> <!--定义servet的名称(别名)-->
+        <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class> <!--servlet类的全类名-->
+        <init-param>
+            <param-name>contextConfigLocation</param-name>
+            <param-value>classpath:springmvc-config.xml</param-value>
+        </init-param>
+        <load-on-startup>1</load-on-startup>
+        <!--值大于或等于0时，在程序启动期间即加载这个servlet，默认或者小于0时，等到tomcat调用servlet时才被加载-->
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>default</servlet-name> <!--使用tomcat默认servlet拦截*.html请求-->
+        <url-pattern>*.html</url-pattern> <!--处理html资源，如果需要处理如css、js等资源和这个一样继续添加-->
+    </servlet-mapping>
+
+    <servlet-mapping> <!--设置servlet的拦截请求-->
+        <servlet-name>springmvc</servlet-name> <!--servlet名称，这里使用我们上面的-->
+        <url-pattern>/</url-pattern> <!--匹配路径-->
+    </servlet-mapping>
+
+</web-app>
+```
+
+**当然还有其他方法比如静态资源映射等方法，请读者自行查阅并选择......**
+
+
+
+## 第一个SpringMVC程序-基于全注解方式
+
+### 目录结构
+
+先不用管那个controller文件夹，这里删除了web.xml与springmvc的xml的配置文件，新建了两个类如下
+
+![image-20240525144001783](D:\Work\Mark\Java Basis\assets\image-20240525144001783.png)
+
+### 代替SpringMvc XML配置文件
+
+新建`SpringMvcConfig`类
+
+加上`@Configuration`注解表示这是一个配置Spring配置文件即可(包扫描现在可以不管，这还是初始项目)
+
+```java
+package com.chikie.config;
+
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class SpringMvcConfig {
+}
+```
+
+
+
+### ServletConfig代替web.xml
+
+新建`ServletConfig`类，继承并实现抽象类`AbstractAnnotationConfigDispatcherServletInitializer`
+
+```java
+package com.chikie.config;
+
+import org.springframework.web.servlet.support.AbstractAnnotationConfigDispatcherServletInitializer;
+
+public class ServletConfig extends AbstractAnnotationConfigDispatcherServletInitializer {
+    @Override
+    protected Class<?>[] getRootConfigClasses() {
+        return null;
+    } // 加载Spring配置类，这里用不到所以return null
+
+    @Override
+    protected Class<?>[] getServletConfigClasses() {
+        return new Class[] {SpringMvcConfig.class};
+    } // 加载SpringMVC配置类
+
+    @Override
+    protected String[] getServletMappings() {
+        return new String[] {"/"};
+    } // 设置请求匹配路径(拦截路径)
+}
+```
+
+
+
+#### AbstractAnnotationConfigDispatcherServletInitializer解析
+
+这里引用CSDN上面的一篇文章(是不是原创不知道)
+
+> ​	在Servlet3.0环境中，容器会在类路径中查找实现`javax.servlet.ServletContainerInitializer`接口的类，如果找到的话就用它来配置Servlet容器。
+>  Spring提供了这个接口的实现，名为`SpringServletContainerInitializer`，这个类反过来又会查找实现`WebApplicationInitializer`的类并将配置的任务交给它们来完成。
+>
+> ​	Spring3.2引入了一个便利的`WebApplicationInitializer`基础实现，名为`AbstractAnnotationConfigDispatcherServletInitializer`，当我们的类实现了`AbstractAnnotationConfigDispatcherServletInitializer`并将其部署到Servlet3.0容器的时候，容器会自动发现它，并用它来配置Servlet上下文。
+
+[CSDN]: https://blog.csdn.net/qq_41865229/article/details/121588209
+
+![](D:\Work\Mark\Java Basis\assets\springmvc.png)
+
+### 没想到吧还是我404
+
+如果这里你还是采用的.html的页面，恭喜你还是404，那么采用全注解方式如何解决静态资源访问的问题呢？
+
+还是按照官方的来
+
+[Spring官方文档]: https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-config/static-resources.html
+
+这里还是将静态的html文件统一的丢进一个文件夹内，就叫`pages`吧
+
+![image-20240525160414702](D:\Work\Mark\Java Basis\assets\image-20240525160414702.png)
+
+有两种方案进行处理，任选其一即可。
+
+#### **静态资源映射方法处理**
+
+这里我们就不像官方那样再新建一个类了，我们直接在SpringMVC的配置类中写，实现`WebMvcConfigurer`类，并重写`addResourceHandlers`方法
+
+**`SpringMvcConfig`配置类**
+
+```java
+package com.chikie.config;
+
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.*;
+
+@Configuration
+public class SpringMvcConfig implements WebMvcConfigurer {
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/pages/**").addResourceLocations("/pages/"); // 表示将URL路径中的/pages/**映射到/pages/文件夹中对应文件 这里**表示匹配/后多个目录，只有一个*表示匹配该级目录
+        WebMvcConfigurer.super.addResourceHandlers(registry);
+    }
+}
+
+```
+
+#### 启用默认Servlet处理
+
+当所有其他Servlet无法处理时交给该Servlet处理(默认最低优先级)-来自官方文档
+
+依旧是实现`WebMvcConfigurer`接口，重写方法`configureDefaultServletHandling`，代码如下
+
+```java
+package com.chikie.config;
+
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.*;
+
+@Configuration
+public class SpringMvcConfig implements WebMvcConfigurer {
+    @Override
+    public void configureDefaultServletHandling(DefaultServletHandlerConfigurer configurer) {
+        configurer.enable(); // 启用默认Servlet
+   }
+}
+
+```
+
+
+
+#### 关于WebMvcConfigurer和WebMvcConfigurationSupport
+
+作者这里踩坑了，刚开始使用`WebMvcConfigurationSupport`做静态映射始终不生效，原因可参考下方链接
+
+**WebMvcConfigurer**：主要用于添加或修改Spring MVC的配置，如添加拦截器，自定义消息转换器等（**推荐优先使用该类**）。
+**WebMvcConfigurationSupport**：主要用于完全自定义Spring MVC的配置，如果我们需要对Spring MVC的配置进行大量的自定义，可以选择继承该类并重写其中的方法。但是需要注意的是，**继承该类会覆盖Spring MVC的部分默认配置导致WebMVC自动配置失效**。因此，**当我们只需要对部分配置进行自定义时，应该使用WebMvcConfigurer**。
+
+[问题]: https://github.com/spring-projects/spring-boot/issues/32094
+
+
+
+## 使用控制器进行访问拦截与处理
+
+### **编写控制器类**
+
+![image-20240525190000383](D:\Work\Mark\Java Basis\assets\image-20240525190000383.png)
+
+**`MyController`类**
+
+```java
+package com.chikie.controller;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+
+@Controller // 使用该注解表示该类为控制器类
+public class MyController {
+    @RequestMapping(value = "/", method = RequestMethod.GET) // 请求路径匹配 访问localhost:8080/ 匹配到/时由该函数进行处理
+    public String indexDisplay() {
+        return "/pages/index.html"; // 访问/pages/index.html文件
+    }
+
+    @RequestMapping(value = "/hello", method = RequestMethod.GET)
+    public String helloDisplay() {
+        return "/pages/hello.html";
+    }
+}
+
+```
+
+**`@RequestMapping`注解**
+
+- `value`值表示要匹配的路径
+- `method`值表示匹配的请求方法GET、POST、PUT、DELETE、OPTIONS....，`method`值可以缺省经过测试默认是GET方法，不过还是强烈建议加上值
+
+
+
+### **修改SpringMVC配置类**
+
+**必须使用注解`@ComponentScan`开启包扫描并添加控制器类，必须使用注解`@EnableWebMvc`**
+
+```java
+package com.chikie.config;
+
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.*;
+
+@Configuration // 表明这是一个Spring配置类
+@ComponentScan({"com.chikie.controller"}) // 开启包扫描，添加控制器的包
+@EnableWebMvc // 开启SpringMVC功能
+public class SpringMvcConfig implements WebMvcConfigurer {
+
+//    @Override
+//    public void configureDefaultServletHandling(DefaultServletHandlerConfigurer configurer) {
+//        configurer.enable(); // 开启默认Servlet
+//    }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/pages/**").addResourceLocations("/pages/"); // 静态资源映射
+        WebMvcConfigurer.super.addResourceHandlers(registry);
+    }
+}
+
+```
+
+**关于@EnableWebMvc`注解的作用**
+
+- 启用SpringMVC
+- 提供了SpringMVC的默认配置
+
+- `@EnableWebMvc`相当于XML中的`<mvc:annotation-driven />`。它支持使用`@Controller`将传入请求映射到特定方法的`@RequestMapping`注释类
+
+
+
+**测试结果**
+
+![image-20240525194123903](D:\Work\Mark\Java Basis\assets\image-20240525194123903.png)
+
+
+
