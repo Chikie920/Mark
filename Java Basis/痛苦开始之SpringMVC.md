@@ -685,3 +685,5 @@ public class MyController {
 
 
 #### 获取JSON格式的数据
+
+由于需要传输`Json`数据，这里推荐使用`ApiFox`(垃圾PostMan)
