@@ -455,9 +455,18 @@ public class MyController {
 
 ```
 
-**`@RequestMapping`注解**
+#### **`@RequestMapping`注解**
+
+表示匹配请求进行处理，只能作用于类或方法上
 
 - `value`值表示要匹配的路径
+
+  **Ant风格的value**，value是可以用来匹配路径的，路径支持模糊匹配，我们把这种模糊匹配称之为Ant风格。关于路径中的通配符包括：
+
+  1. `?`代表**任意一个字符**
+  2. `*`代表**0到N个任意字符**
+  3. `**`代表0到N个任意字符，并且路径中可以出现路径分隔符 /，** 通配符在使用时，左右不能出现字符，只能是 /
+
 - `method`值表示匹配的请求方法GET、POST、PUT、DELETE、OPTIONS....，`method`值可以缺省经过测试默认是GET方法，不过还是强烈建议加上值
 
 
@@ -494,6 +503,8 @@ public class SpringMvcConfig implements WebMvcConfigurer {
 
 **关于@EnableWebMvc`注解的作用**
 
+如果不启用控制器将不会工作
+
 - 启用SpringMVC
 - 提供了SpringMVC的默认配置
 
@@ -507,3 +518,170 @@ public class SpringMvcConfig implements WebMvcConfigurer {
 
 
 
+### 使用控制器获取URL参数以及返回原始内容
+
+首先了解什么是RESTful风格API
+
+#### RESTful风格API
+
+##### URL设计规范
+
+这里我直接引用别人写的(我觉得以及写的很好了，没有必要再写一遍，文章请见ref目录SpringMVC01)
+
+![image-20240526121417553](D:\Work\Mark\Java Basis\assets\image-20240526121417553.png)
+
+![image-20240526121515027](D:\Work\Mark\Java Basis\assets\image-20240526121515027.png)
+
+##### 请求设计规范
+
+按照不同的请求方式代表不同的操作类型
+
+- 发送**GET**请求是用来做**查询**
+- 发送**POST**请求是用来做**新增**发送
+- **PUT**请求是用来做**修改**
+- 发送**DELETE**请求是用来做**删除**
+
+![image-20240526121717672](D:\Work\Mark\Java Basis\assets\image-20240526121717672.png)
+
+##### 举个栗子
+
+使用`GET`请求查询内容http://localhost:8080/users/chikie/21表示查询所有用户中名为chikie并且21岁的用户
+
+
+
+#### @ResponseBody注解
+
+`@RequestMapping`修饰方法只能返回`void`或者`String`类型，当返回`String`类型数据时，默认会定向到该返回值的目录下。如果我们想直接返回`String`数据而不是重定向呢？这就要使用该注解了。
+
+`@ResponseBody`注解可以设置当前控制器方法响应内容为当前返回值，无需解析。
+
+
+
+#### 如何获取RESTful风格请求的参数值
+
+使用`{变量名(任取)}`的形式进行URL的占位，在处理函数参数列表中使用`@PathVariable`注解并传入要获取的对应变量名即可
+
+更改后的`MyController`控制器类代码如下
+
+```java
+package com.chikie.controller;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+@Controller // 使用该注解表示该类为控制器类
+public class MyController {
+    @RequestMapping(value = "/add/{a}/{b}", method = RequestMethod.GET) // RESTful风格的请求地址，并且采用占位符的方式获取值
+    @ResponseBody // 返回原始内容
+    public String add(@PathVariable("a") int num1, @PathVariable("b") int num2) { // 将获取的参数值传入处理函数
+        return "{\"res\" : " + (num1+num2) + "}"; // 返回json数据
+    }
+}
+```
+
+**运行结果**
+
+![image-20240526125323276](D:\Work\Mark\Java Basis\assets\image-20240526125323276.png)
+
+
+
+#### 使用原始方式获取参数
+
+##### 获取简单类型参数
+
+即通过http://localhost:8080/add?key1=value2&key2=value2的形式进行参数传递
+
+更改控制器代码如下
+
+```java
+package com.chikie.controller;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+@Controller // 使用该注解表示该类为控制器类
+public class MyController {
+    @RequestMapping(value = "/add", method = RequestMethod.GET)
+    @ResponseBody
+    public String add(@RequestParam("num1") int num1, @RequestParam("num2") int num2) { // 使用RequestParam注解获取对应参数值
+        return "{\"res\" : " + (num1+num2) + "}"; // 返回json数据
+    }
+}
+```
+
+**运行结果**
+
+![image-20240526132122783](D:\Work\Mark\Java Basis\assets\image-20240526132122783.png)
+
+##### 获取对象参数
+
+创建实体类`Student`
+
+```java
+package com.chikie.entity;
+
+public class Student {
+    private String name;
+    private int age;
+
+    public Student() {
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+```
+
+修改控制器类
+
+```java
+package com.chikie.controller;
+
+import com.chikie.entity.Student;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+@Controller // 使用该注解表示该类为控制器类
+public class MyController {
+    @RequestMapping(value = "/students", method = RequestMethod.GET)
+    @ResponseBody
+    public String getStudent(Student student) {
+        return student.toString();
+    }
+}
+```
+
+**运行结果**
+
+![image-20240526132642897](D:\Work\Mark\Java Basis\assets\image-20240526132642897.png)
+
+可见SpringMVC为我们自动装配了类
+
+**注意点**
+
+请求URL中的key值必须与实体类中对应属性的set方法名称对应(类似于Spring教程中使用配置文件进行**依赖注入**时一样)
+
+
+
+#### 获取JSON格式的数据
