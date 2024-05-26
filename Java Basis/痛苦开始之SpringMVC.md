@@ -686,4 +686,100 @@ public class MyController {
 
 #### 获取JSON格式的数据
 
+`SpringMVC`默认使用Jackson来进行Json数据的解析操作，这里我们先使用maven导入依赖
+
+```xml
+<dependency>
+    <groupId>com.fasterxml.jackson.core</groupId>
+    <artifactId>jackson-databind</artifactId>
+    <version>2.17.1</version>
+</dependency>
+<!--SpringMVC Json数据处理依赖-->
+```
+
+同时，你的SpringMVC配置类中必须有注解`@EnableWebMvc`，该注解会自动进行Json到实体类的转换(实际上没有这个注解，控制器都无法处理请求-servlet找不到控制器)
+
+
+
+首先新建实体类`Student`
+
+```java
+package com.chikie.entity;
+
+public class Student {
+    private String name;
+    private int age;
+
+    public Student() {
+    } // 必须包含无参方法
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+```
+
+控制器类
+
+```java
+package com.chikie.controller;
+
+import com.chikie.entity.Student;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+@Controller // 使用该注解表示该类为控制器类
+public class MyController {
+    @RequestMapping(value = "/students", method = RequestMethod.POST)
+    @ResponseBody // 返回原始内容
+    public String getStudent(@RequestBody Student student) {
+        return student.toString();
+    }
+}
+```
+
+
+
+**运行测试**
+
 由于需要传输`Json`数据，这里推荐使用`ApiFox`(垃圾PostMan)
+
+![image-20240526210133769](D:\Work\Mark\Java Basis\assets\image-20240526210133769.png)
+
+
+
+##### 一个逆天问题-HttpMessageNotReadableException: Required request body is missing或者是400、415代码
+
+**问题描述**：在正确写完所有代码后（包括`@EnableWebMvc`注解），测试过程中**SpringMVC无法正常接收Json数据**，并且**控制器失效-无法进入控制器进行处理**，IDEA控制台出现`HttpMessageNotReadableException: Required request body is missing`问题。在多次更换注解如`@RestController`、`@PostMapping`，请求方法GET、POST都试过了....均无效，不断出现`400`、`415`代码(由于这里只进行了Json的测试，其他的如页面访问的没有测试，所以并不知道是不是`@EnableWebMvc`注解失效了)
+
+**我是如何解决的**：我又重新新建了一个模块又写了一遍代码(和原来一样)结果能够正常运行，我又回到原来的代码模块中，打开模块设置将模块工件移除后又重新添加后，运行正常。耗费我五六个小时的问题这样解决了......
+
+**我的建议：**如果你遇到类似的问题请以如下方式进行检查
+
+- `@EnableWebMvc`注解是否添加到SpringMVC配置文件中
+- `Jackson`依赖是否添加
+- 最好使用POST方法进行Json数据的传入，Json数据格式要正确
+- 尝试更换`@RequestMapping`注解到`@PostMapping`，更换`@Controller`注解到`@RestController`
+- 重新配置IDEA工件
+
+真tm无语的逆天问题.....
