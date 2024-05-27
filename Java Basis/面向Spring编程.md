@@ -1859,3 +1859,4 @@ public void advice(Object 变量名) { // 注意上下变量名要相同，且�
 
 ## 事务
 
+**建议学完SpringMCV与Mybatis后再来看这部分内容**

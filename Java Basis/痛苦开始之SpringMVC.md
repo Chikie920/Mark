@@ -4,7 +4,7 @@
 
 [作者博客]: https://chikie920.github.io/
 
-嗯，要开始写Web和Sql了......
+**嗯，要开始做配置与写Web了......**
 
 
 
@@ -783,3 +783,251 @@ public class MyController {
 - 重新配置IDEA工件
 
 真tm无语的逆天问题.....
+
+
+
+## 使用RESTful风格简化代码
+
+**注解说明**
+
+- `@RestController`，类注解，相当于`@Controller`+`@ResponseBody`
+- `@GetMapping @PostMapping @PutMapping @DeleteMapping`，设置当前控制器方法请求访问路径与请求动作，相当于`@RequestMapping`的简化
+
+
+
+**简化前的控制器代码**
+
+```java
+package com.chikie.controller;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+public class MyController {
+
+    @RequestMapping(value = "/api/users", method = RequestMethod.GET)
+    public String getUser() {
+        return "返回user信息";
+    }
+
+    @RequestMapping(value = "/api/students", method = RequestMethod.POST)
+    public String addStudent() {
+        return "新增student信息";
+    }
+}
+```
+
+**简化后**
+
+```java
+package com.chikie.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api") // 由于该控制器类中所有处理方法的匹配路径都有/api前缀，这里直接写在类上，表示该类所有方法都匹配/api前缀
+public class MyController {
+
+    @GetMapping("/users") // 匹配/users的GET请求
+    public String getUser() {
+        return "返回user信息";
+    }
+
+    @PostMapping("/students") // 匹配/students的POST请求
+    public String addStudent() {
+        return "新增student信息";
+    }
+}
+```
+
+
+
+## 拦截器
+
+### 概念
+
+这里我直接放别人写好的（已经写得很好了，请见ref目录下的SpringMVC02）
+
+![image-20240527133034132](D:\Work\Mark\Java Basis\assets\image-20240527133034132.png)
+
+![image-20240527133223659](D:\Work\Mark\Java Basis\assets\image-20240527133223659.png)
+
+![](D:\Work\Mark\Java Basis\assets\springmvc01.png)
+
+![](D:\Work\Mark\Java Basis\assets\springmvc02.png)
+
+**总而言之**，拦截器就是在Controller处理之前对请求进行拦截处理
+
+
+
+### 过滤器与拦截器的区别
+
+来源于GPT回答
+
+- **过滤器**：作用于所有的Web请求，包括静态资源。
+- **拦截器**：只作用于Spring MVC的请求，不作用于静态资源
+- **过滤器**：属于Servlet容器层次，早于Spring框架处理。
+- **拦截器**：属于Spring MVC框架层次，在Controller方法调用之前和之后进行处理。
+- **过滤器**：常用于编码设置、安全检查、日志记录等全局性任务。
+- **拦截器**：常用于业务逻辑处理，如权限验证、数据预处理等。
+
+
+
+### 自定义拦截器
+
+SpringMVC中的拦截器需要实现`org.springframework.web.servlet.HandlerInterceptor`接口
+
+这里我们创建一个拦截器类实现该接口
+
+**MyInterceptor类**
+
+```java
+package com.chikie.config;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.ModelAndView;
+
+@Component // 纳入Spring的管理
+public class MyInterceptor implements HandlerInterceptor {
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        System.out.println("preHandle......");
+        return true;
+    } // 预处理
+
+    @Override
+    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
+        System.out.println("postHandle......");
+    } // 后处理
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+        System.out.println("afterCompletion......");
+    } // 完成后的处理
+}
+
+```
+
+
+
+**更改`SpringMVC`配置类**
+
+```java
+package com.chikie.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.*;
+
+@Configuration
+@ComponentScan({"com.chikie.controller", "com.chikie.config"}) // 将配置文件也纳入Spring包扫描中，以便Spring进行管理
+@EnableWebMvc
+public class SpringMvcConfig implements WebMvcConfigurer {
+
+    @Autowired // 启用自动装配
+    private MyInterceptor myInterceptor;
+
+//    @Override
+//    public void configureDefaultServletHandling(DefaultServletHandlerConfigurer configurer) {
+//        configurer.enable(); // 开启默认Servlet
+//    }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/pages/**").addResourceLocations("/pages/"); // 静态资源映射
+        WebMvcConfigurer.super.addResourceHandlers(registry);
+    } // 静态资源管理
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(myInterceptor).addPathPatterns("/api/users"); // 添加我们的自定义拦截器类并配置拦截URL路径
+        WebMvcConfigurer.super.addInterceptors(registry);
+    } // 拦截器管理
+}
+```
+
+
+
+**控制器代码**
+
+```java
+package com.chikie.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api") // 由于该控制器类中所有处理方法的匹配路径都有/api前缀，这里直接写在类上，表示该类所有方法都匹配/api前缀
+public class MyController {
+
+    @GetMapping("/users") // 匹配/users的GET请求
+    public String getUser() {
+        return "返回user信息";
+    }
+
+    @PostMapping("/students") // 匹配/students的POST请求
+    public String addStudent() {
+        return "新增student信息";
+    }
+}
+```
+
+
+
+**运行测试**
+
+使用GET方法请求`http://localhost:8080/api/users`
+
+![image-20240527142552354](D:\Work\Mark\Java Basis\assets\image-20240527142552354.png)
+
+
+
+### 注意
+
+拦截器的拦截URL规则是从`根 /`开始匹配的
+
+可以使用通配符`*`、`**`来进行匹配
+
+例如使用`/api/**`可以匹配api后所有请求
+
+
+
+### 关于重写的三个方法
+
+●preHandle：处理器方法调用之前执行，**只有该方法有返回值，返回值是布尔类型，true放行，false拦截**。
+
+​	若返回false则请求只会到`preHandle`这一步，直接被拦截了，后面的步骤均不会执行!控制器也不会执行!
+
+●postHandle：处理器方法调用之后执行
+
+●afterCompletion：渲染完成后执行
+
+![image-20240527143321151](D:\Work\Mark\Java Basis\assets\image-20240527143321151.png)
+
+
+
+这三个方法中，最常用的是**preHandle**,在这个方法中可以通过返回值来决定是否要进行放行，我们可以把业务逻辑放在该方法中，如果满足业务则返回true放行，不满足则返回false拦截。
+
+
+
+### 拦截器链
+
+这个自行了解吧，下面就放个图算了
+
+![image-20240527143521320](D:\Work\Mark\Java Basis\assets\image-20240527143521320.png)
+
+## SpringMVC执行流程
+
+这里也贴个图吧
+
+![](D:\Work\Mark\Java Basis\assets\springmvc03.png)
+
+
+
+## 完结
+
+SpringMVC基础教程就此告一段落，后面可能会出关于SpringMVC原理与实现的部分，马上到来的是Mybatis
