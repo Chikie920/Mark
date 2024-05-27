@@ -1462,8 +1462,7 @@ import org.junit.jupiter.api.Test;
 public class MySpringTest {
     @Test
     public void getElementTest() {
-        XMLApplicationContext xmlApplicationContext = new XMLApplicationContext(MySpringTest.class.getClassLoader().getResource("MySpringC" +
-                "onfig.xml").getPath());
+        XMLApplicationContext xmlApplicationContext = new XMLApplicationContext(MySpringTest.class.getClassLoader().getResource("MySpringConfig.xml").getPath());
         Object bean = xmlApplicationContext.getBean("chikie"); // 使用id获取bean
         System.out.println(bean);
         Object dog = xmlApplicationContext.getBean("dog"); // 使用别名获取bean
