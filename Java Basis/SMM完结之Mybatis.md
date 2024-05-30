@@ -1,4 +1,4 @@
-# What Can I Say? Mybatis Out!
+# Man,What Can I Say? Mybatis Out!
 
 [^作者]: Chikie
 
@@ -234,6 +234,123 @@ public class MybatisTest {
 `<mapper>` 标签通过 `namespace` 属性定义一个唯一的命名空间。这个命名空间通常与对应的 Mapper 接口相关联，确保 SQL 语句与相应的 Mapper 方法匹配。
 
 `<mapper>` 标签内包含多个子元素，这些子元素定义了具体的 SQL 语句、结果映射、参数映射等内容。常见的子元素包括 `<select>`, `<insert>`, `<update>`, `<delete>`, 和 `<resultMap>` 等。
+
+##### 当两个映射文件中的存在方法重名
+
+现在有两个映射文件
+
+**UserMapper.xml**
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="user">
+
+    <select id="selectOne" resultType="com.chikie.entity.User">
+        SELECT * FROM users WHERE name = #{name}
+    </select>
+
+</mapper>
+```
+
+**UserMapper2.xml**
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="user2">
+
+    <select id="selectOne" resultType="com.chikie.entity.User">
+        SELECT * FROM users WHERE name = #{name}
+    </select>
+
+</mapper>
+```
+
+它们内容只有命名空间不同
+
+并且在Mybatis配置文件中注册
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "https://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <environments default="development">
+        <environment id="development">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="com.mysql.cj.jdbc.Driver"/>
+                <property name="url" value="jdbc:mysql://localhost:3306/mybatis_test"/>
+                <property name="username" value="root"/>
+                <property name="password" value="123456"/>
+            </dataSource>
+        </environment>
+    </environments>
+
+    <mappers>
+        <mapper resource="UserMapper.xml"></mapper>
+        <mapper resource="UserMapper2.xml"></mapper>
+    </mappers> <!--注册该sql映射文件-->
+
+</configuration>
+```
+
+**测试**
+
+```java
+package com.chikie.test;
+
+import com.chikie.entity.User;
+import com.chikie.utils.SqlSessionUtil;
+import org.apache.ibatis.session.SqlSession;
+
+
+public class MybatisTest {
+    public static void main(String[] args) {
+        SqlSession sqlSession = SqlSessionUtil.getSqlSession(); // 获取SqlSession对象
+        User res = sqlSession.selectOne("selectOne", "chikie"); // 查询一个结果
+        System.out.println(res);
+        sqlSession.close();
+    }
+}
+
+```
+
+运行结果
+
+![image-20240530101931381](D:\Work\Mark\Java Basis\assets\image-20240530101931381.png)
+
+Mybatis无法识别方法，使用命名空间进行方法的区分
+
+```java
+package com.chikie.test;
+
+import com.chikie.entity.User;
+import com.chikie.utils.SqlSessionUtil;
+import org.apache.ibatis.session.SqlSession;
+
+
+public class MybatisTest {
+    public static void main(String[] args) {
+        SqlSession sqlSession = SqlSessionUtil.getSqlSession(); // 获取SqlSession对象
+        User res = sqlSession.selectOne("user.selectOne", "chikie");
+        User res2 = sqlSession.selectOne("user2.selectOne", "chikie");
+        System.out.println(res);
+        System.out.println(res2);
+        sqlSession.close(); // 记得关闭
+    }
+}
+
+```
+
+运行结果为
+
+`User{name='chikie', age=21}
+User{name='chikie', age=21}`
+
+
 
 #### 测试代码解析
 
@@ -611,3 +728,211 @@ public class MybatisTest {
 运行结果
 
 ![image-20240529153314391](D:\Work\Mark\Java Basis\assets\image-20240529153314391.png)
+
+## Mybatis注解式开发
+
+这里还是保留mybatis的xml配置文件，使用类来代替Mapper文件，如果将配置文件也用类来代替多少有点不方便(每次需要手动获取SqlSession)，等到SSM的时候可以使用Spring来进行管理自动装配，那时候可以方便实现Mybatis的全注解开发。
+
+**项目结构**
+
+![image-20240530120428897](D:\Work\Mark\Java Basis\assets\image-20240530120428897.png)
+
+**`MybatisConfig.xml`**
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "https://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <environments default="development">
+        <environment id="development">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="com.mysql.cj.jdbc.Driver"/>
+                <property name="url" value="jdbc:mysql://localhost:3306/mybatis_test"/>
+                <property name="username" value="root"/>
+                <property name="password" value="123456"/>
+            </dataSource>
+        </environment>
+    </environments>
+
+    <mappers>
+        <mapper class="com.chikie.dao.UserDao"></mapper>
+    </mappers> <!--注册该sql映射文件-->
+
+</configuration>
+```
+
+**User类**
+
+```java
+package com.chikie.entity;
+
+public class User {
+    private String name;
+    private int age;
+
+    public User() {
+    }
+
+    public User(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+
+```
+
+**SqlSessionUtil类**
+
+```java
+package com.chikie.utils;
+
+import com.chikie.test.MybatisTest;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+
+public class SqlSessionUtil {
+    private static SqlSessionFactory sqlSessionFactory; // 全局只存在一个
+
+    static {
+        SqlSessionFactoryBuilder sqlSessionFactoryBuilder = new SqlSessionFactoryBuilder(); // 获取SqlSessionFactoryBuilder对象
+        String configPath = MybatisTest.class.getResource("/MybatisConfig.xml").getPath(); // 获取配置文件路径
+        FileInputStream fileInputStream = null;
+        try {
+            fileInputStream = new FileInputStream(configPath); // 读取配置文件
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        sqlSessionFactory = sqlSessionFactoryBuilder.build(fileInputStream);
+    } // 类被加载的时候仅执行一次
+
+    public static SqlSession getSqlSession() {
+        return sqlSessionFactory.openSession();
+    } // 获取SqlSession
+
+}
+
+```
+
+**MybatisTest类**
+
+```java
+package com.chikie.test;
+
+import com.chikie.dao.UserDao;
+import com.chikie.entity.User;
+import com.chikie.utils.SqlSessionUtil;
+import org.apache.ibatis.session.SqlSession;
+
+import java.util.List;
+
+
+public class MybatisTest {
+    public static void main(String[] args) {
+        SqlSession sqlSession = SqlSessionUtil.getSqlSession(); // 获取SqlSession对象
+        System.out.println("****新增操作****");
+        User chikie = new User("chikie", 21);
+        User john = new User("john", 14);
+        int res1 = sqlSession.insert("insertUser", chikie);
+        System.out.println(res1);
+        int res2 = sqlSession.insert("insertUser", john);
+        System.out.println(res2);
+        sqlSession.commit(); // 提交更新
+        System.out.println("****更新操作****");
+        User jack = new User("jack", 14);
+        UserDao mapper = sqlSession.getMapper(UserDao.class); // 根据mapper类获取mapper
+        int res3 = mapper.updateUserInfoByName("john", jack);
+        System.out.println(res3);
+        sqlSession.commit(); // 提交更新
+        System.out.println("****查询一个****");
+        User user = sqlSession.selectOne("selectUserByName", "jack");
+        System.out.println(user);
+        System.out.println("****删除操作****");
+        int res4 = sqlSession.delete("deleteUserByName", "jack");
+        System.out.println(res4);
+        sqlSession.commit(); // 提交更新
+        System.out.println("****查询全部****");
+        List<User> selectAllUsers = sqlSession.selectList("selectAllUsers");
+        selectAllUsers.forEach(u->{
+            System.out.println(u);
+        });
+        sqlSession.close(); // 记得关闭
+    }
+}
+
+```
+
+**UserDao类**
+
+```java
+package com.chikie.dao;
+
+import com.chikie.entity.User;
+import org.apache.ibatis.annotations.*;
+
+import java.util.List;
+
+public interface UserDao {
+    @Select("SELECT * FROM users")
+    List<User> selectAllUsers(); // 查询所有用户
+    @Select("SELECT * FROM users WHERE name = #{name}")
+    User selectUserByName(String name); // 根据名称查询用户
+    @Update("UPDATE users SET name = #{user.name}, age = #{user.age} WHERE name = #{uName}")
+    int updateUserInfoByName(@Param("uName") String name, @Param("user") User user); // 根据名称更新用户信息
+    @Delete("DELETE FROM users WHERE name = #{name}")
+    int deleteUserByName(String name); // 根据名称删除用户
+    @Insert("INSERT INTO users (name, age) VALUES (#{name}, #{age})")
+    int insertUser(User user); // 新增用户
+}
+
+```
+
+运行结果
+
+![image-20240530120618081](D:\Work\Mark\Java Basis\assets\image-20240530120618081.png)
+
+### 代码解释
+
+#### 根据SqlSession获取mapper对象
+
+使用SqlSession的getMapper方法传入mapper类.class进行获取，可以直接调用mapper对象的方法(需要传入多个参数时好用，避免写map)
+
+#### @Param注解
+
+`@Param` 注解在 MyBatis 中用于在映射器接口的方法中给参数命名，这样在 SQL 语句中可以直接引用这些参数。它的主要作用是解决多参数传递时的参数名称问题，使 SQL 语句更加清晰易读。
+
+对于只传入一个对象作为参数时可以不用写`@Param`注解，Mybatis自动进行解析。当有多个参数且包含对象参数时需要加上，在SQL代码中采用`类名.属性`的方式获取参数值。
+
+`@Param`还可以用户设置参数的别名。
+
+
+
+## 动态SQL
