@@ -209,7 +209,7 @@ Spring MVC框架是围绕`DispatcherServlet`来设计的，`DispatcherServlet`�
        http://www.springframework.org/schema/context
        https://www.springframework.org/schema/context/spring-context.xsd">
 
-	<!--	<mvc:annotation-driven />  后续如果要使用XML配置方式进行请求的拦截与处理，需要加上该标签表示启用SpringMVC功能 由于后面的例子都将采用注解的形式，只在这里进行说明 -->
+	<!--	<context:component-scan base-package="com.chikie.controller" />  后续如果要使用XML配置方式进行请求的拦截与处理，需要加上该标签扫描controller包下的控制器 由于后面的例子都将采用注解的形式，只在这里进行说明 -->
 
 </beans>
 ```
@@ -367,7 +367,17 @@ public class ServletConfig extends AbstractAnnotationConfigDispatcherServletInit
 
 #### **静态资源映射方法处理**
 
-这里我们就不像官方那样再新建一个类了，我们直接在SpringMVC的配置类中写，实现`WebMvcConfigurer`类，并重写`addResourceHandlers`方法
+这里我们就不像官方那样再新建一个类了，我们直接在SpringMVC的配置类中写，实现`WebMvcConfigurer`接口，并重写`addResourceHandlers`方法
+
+
+
+关于`WebMvcConfigurer`接口，官方文档是这样写的
+
+<img src="D:\Work\Mark\Java Basis\assets\image-20240604191441238.png" alt="image-20240604191441238" style="zoom:200%;" />
+
+意思是采用@EnableWebMvc注解修饰的类可用通过实现该接口来修改默认的WebMvc配置。
+
+
 
 **`SpringMvcConfig`配置类**
 
@@ -503,7 +513,7 @@ public class SpringMvcConfig implements WebMvcConfigurer {
 
 **关于@EnableWebMvc`注解的作用**
 
-如果不启用控制器将不会工作
+如果不启用控制器将不会正常工作
 
 - 启用SpringMVC
 - 提供了SpringMVC的默认配置

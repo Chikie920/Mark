@@ -935,4 +935,6 @@ public interface UserDao {
 
 
 
-## 动态SQL
+## 完结
+
+后面可以开始做一些项目巩固SSM基础，并且开始学习SpringBoot

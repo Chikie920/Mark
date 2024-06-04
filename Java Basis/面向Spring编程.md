@@ -805,7 +805,7 @@ public class SpringTest {
 <bean id="xxx" class="com.chikie.entity.xxx"></bean>
 ```
 
-​		其中xxx可以作为`@Component参数`进行设置
+​		其中xxx可以作为`@Component参数`进行设置来指定bean的id
 
 - `@Configuration`，表示本类为Spring配置类，用于取代XML配置文件
 - `@ComponentScan`，开启包扫描
@@ -1637,7 +1637,7 @@ Spring对AOP的实现包括以下3种方式：
 
 ### 用人话来进行概念介绍
 
-- **连接点** `Joinpoint`：可以在目标方法中插入代码的位置。比如目标函数执行之前、执行之后、发生异常时、返回结果后......具体看后面的例子就懂了。
+- **连接点** `Joinpoint`：可以在目标方法中插入代码的位置。比如目标函数(方法)执行之前、执行之后、发生异常时、返回结果后......具体看后面的例子就懂了。
 
 - **切点** `Pointcut`：一个切点对应多个连接点，就是目标函数的意思，一个目标方法就是一个切点(目标函数中可以插入代码的连接点的集合)。
 
@@ -1720,7 +1720,7 @@ public class MyService {
 
     public Integer methodTwo() {
         System.out.println("method two......");
-        int num = 1/0;
+        int num = 1/0; // 引发异常
         return -1;
     }
 }
