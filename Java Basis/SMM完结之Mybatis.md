@@ -935,6 +935,169 @@ public interface UserDao {
 
 
 
+## 分页
+
+### 查询方式
+
+> https://juejin.cn/post/6987553953156169742
+
+![image-20240611140132477](D:\Work\Mark\Java Basis\assets\image-20240611140132477.png)
+
+### 原生处理
+
+#### mapper编写
+
+```java
+package com.chikie.dao;
+
+import com.chikie.entity.Employee;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface EmployeeDao {
+    @Select("select id,user_name as userName, name, pass_word as passWord," +
+            "phone, sex, id_number as idNumber, status, create_time as createTime, update_time as updateTime," +
+            "create_user as createUser, update_user as updateUser from employee")
+    public List<Employee> selectAll(); // 获取所有员工信息
+
+    @Select("select id,user_name as userName, name, pass_word as passWord," +
+            "phone, sex, id_number as idNumber, status, create_time as createTime, update_time as updateTime," +
+            "create_user as createUser, update_user as updateUser from employee limit ${start}, ${count}")
+    public List<Employee> pageSelect(@Param("start") String start, @Param("count") String count); // 分页获取
+
+    @Select("select count(*) from employee")
+    public int getCounts(); // 获取总数据量
+}
+
+```
+
+#### 测试类
+
+```java
+package com.chikie.test;
+
+import com.chikie.config.JdbcDataSource;
+import com.chikie.config.SpringConfig;
+import com.chikie.dao.EmployeeDao;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+import java.util.Scanner;
+
+public class SqlTest {
+
+    @Test
+    public void pageSelectTest() {
+        ApplicationContext applicationContext = new AnnotationConfigApplicationContext(SpringConfig.class);
+        EmployeeDao employeeDao = applicationContext.getBean(EmployeeDao.class);
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.print("输入要查询的页号: ");
+        int page = scanner.nextInt(); // 获取页号
+        int counts = employeeDao.getCounts(); // 获取数据总量
+        int totalPages = (int) Math.ceil(counts / 5.0); // 计算总页数
+        if(page<=0) { // 处理可能的输入异常
+            page = 1;
+        } else if(page>totalPages) {
+            page = totalPages;
+        }
+        int start = (page-1) * 5; // 假设每页5条数据
+
+        employeeDao.pageSelect(String.valueOf(start), "5").forEach(e-> System.out.println(e));
+    }
+}
+
+```
+
+
+
+### 使用PageHelper插件-纯注解形式
+
+对于XML配置Mybatis插件(拦截器)网上资料很多，这里不再赘述
+
+如何使用第三方插件(拦截器)
+
+引入依赖
+
+```xml
+<dependency>
+    <groupId>com.github.pagehelper</groupId>
+    <artifactId>pagehelper</artifactId>
+    <version>6.1.0</version>
+</dependency>
+```
+
+只需要在Mybatis配置类中注册即可
+
+```java
+package com.chikie.config;
+
+import com.github.pagehelper.PageInterceptor;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Invocation;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.mapper.MapperScannerConfigurer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+
+import javax.sql.DataSource;
+import java.util.Properties;
+
+public class MybatisConfig {
+    @Bean
+    public SqlSessionFactoryBean getSqlSessionFactoryBean(@Autowired DataSource dataSource) {
+        SqlSessionFactoryBean sqlSessionFactoryBean = new SqlSessionFactoryBean();
+        sqlSessionFactoryBean.setDataSource(dataSource);
+        PageInterceptor pageInterceptor = new PageInterceptor(); // 分页拦截器
+        Properties properties = new Properties(); // 新建配置类
+        properties.setProperty("reasonable", "true"); // 设置参数
+        pageInterceptor.setProperties(properties); // 设置配置
+        sqlSessionFactoryBean.setPlugins(pageInterceptor); // 注册
+        return sqlSessionFactoryBean;
+    }
+
+    @Bean
+    public MapperScannerConfigurer getMapperScannerConfigurer() {
+        MapperScannerConfigurer mapperScannerConfigurer = new MapperScannerConfigurer();
+        mapperScannerConfigurer.setBasePackage("com.chikie.dao");
+        return mapperScannerConfigurer;
+    }
+
+}
+
+```
+
+使用
+
+```java
+@Test
+public void pageHelperTest() {
+    ApplicationContext applicationContext = new AnnotationConfigApplicationContext(SpringConfig.class);
+    EmployeeDao employeeDao = applicationContext.getBean(EmployeeDao.class);
+    Scanner scanner = new Scanner(System.in);
+    System.out.print("输入要查询的页号: ");
+    int page = scanner.nextInt(); // 获取页号
+
+    PageHelper.startPage(page, 5);
+    List<Employee> employees = employeeDao.selectAll(); // 返回类型为com.github.pagehelper.Page
+    System.out.println("直接输出");
+    employees.forEach(e-> System.out.println(e));
+    System.out.println("使用PageInfo封装");
+    PageInfo<Employee> employeePageInfo = new PageInfo<>(employees); // 使用PageInfo对象封装结果
+    List<Employee> list = employeePageInfo.getList(); // getList方法获取封装后的Page对象
+    System.out.println(list.getClass());
+}
+```
+
+![image-20240611153745009](D:\Work\Mark\Java Basis\assets\image-20240611153745009.png)
+
+
+
 ## 完结
 
 后面可以开始做一些项目巩固SSM基础，并且开始学习SpringBoot

@@ -1105,13 +1105,25 @@ Java日志框架编年史
 
 <img src="D:\Work\Mark\Java Basis\assets\javalogbls.jpg" style="zoom:50%;" />
 
+#### 日志框架与日志门面
+
+日志框架技术 JUL、Logback、Log4j、Log4j2
+
+日志门面技术 JCL、SLF4j
+
+每一种日志框架都有自己单独的API，要使用对应的框架就要使用对应的API，这就大大的增加了应用程序代码对于日志框架的耦合性。
+
+我们使用了日志门面技术之后，对于应用程序来说，无论底层的日志框架如何改变，应用程序不需要修改任意一行代码，就可以直接上线了。
+
+**日志门面屏蔽日志框架的底层实现**
 
 
-#### JCL
+
+#### JUL
 
 JUL 全称 Java Util Logging，它是java原生的日志框架，在java.util.logging包下，主要是使用在小型应用中。
 
-**JCL组件**
+**JUL组件**
 
 <img src="D:\Work\Mark\Java Basis\assets\jul_module.jpg" style="zoom: 50%;" />
 
@@ -1119,7 +1131,7 @@ JUL 全称 Java Util Logging，它是java原生的日志框架，在java.util.lo
 - **Handler：**处理器，每个 Logger 都会关联一个或者是一组 Handler，**Logger 会将日志交给关联的Handler 去做处理**，由 Handler 负责将日志做记录。Handler 具体实现了日志的输出位置，比如可以输出到控制台或者是文件中等等。
 - **Filter：**过滤器，根据需要定制哪些信息会被记录，哪些信息会被略过。**过滤日志信息**。
 - **Formatter：**格式化组件，它负责**对日志**中的数据和信息进行转换和**格式化**，所以它决定了我们输出日志最终的形式。
-- **Level：**日志的输出级别，每条日志消息都有一个关联的级别。我们根据输出级别的设置，用来展现最终所呈现的日志信息。根据不同的需求，设置不同的级别。
+- **Level：** **日志的输出级别**，每条日志消息都有一个关联的级别。我们根据输出级别的设置，用来展现最终所呈现的日志信息。根据不同的需求，设置不同的级别。
 
 
 
@@ -1130,7 +1142,7 @@ package com.chikie.basis;
 
 import java.util.logging.Logger; // 引入类
 
-public class JCLTest {
+public class JULTest {
     public static void main(String[] args) {
         Logger logger = Logger.getLogger("com.chikie.basis.JCLTest");
         // 使用Logger.getLogger()方法传入本类的全类名获得Logger对象，即可进行本类的日志管理
@@ -1167,7 +1179,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger; // 引入类
 import java.util.logging.SimpleFormatter;
 
-public class JCLTest {
+public class JULTest {
     public static void main(String[] args) {
         Logger logger = Logger.getLogger("com.chikie.basis.JCLTest");
         // 使用Logger.getLogger()方法传入本类的全类名获得Logger对象，即可进行本类的日志管理
